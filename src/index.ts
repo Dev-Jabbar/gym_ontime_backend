@@ -20,7 +20,11 @@ const app = express();
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://gym-ontime.vercel.app"],
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:4000",
+      "https://gym-ontime.vercel.app",
+    ],
     credentials: true,
   }),
 );

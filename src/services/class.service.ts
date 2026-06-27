@@ -158,8 +158,16 @@ export const deleteClass = async (id: string) => {
   const foundClass = await classRepository.findClassById(id);
   if (!foundClass) throw new AppError("Class not found", 404);
 
-  if (foundClass.members.length > 0) {
-    throw new AppError("Cannot delete class with enrolled members", 400);
+  const now = new Date();
+  const scheduleDate = new Date(foundClass.schedule);
+  const isCompleted = scheduleDate < now;
+
+  // ✅ Only block deletion if class is upcoming/ongoing AND has members
+  if (!isCompleted && foundClass.members.length > 0) {
+    throw new AppError(
+      "Cannot delete a class with enrolled members. Please remove all members first.",
+      400,
+    );
   }
 
   return classRepository.deleteClass(id);

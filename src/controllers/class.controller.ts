@@ -171,6 +171,11 @@ export const deleteClass = async (req: Request, res: Response) => {
       });
     }
 
+    if (error instanceof AppError) {
+      // ✅ add this
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+
     console.error("Delete class error:", error);
     res.status(500).json({ message: "Failed to delete class" });
   }
