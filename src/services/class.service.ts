@@ -4,6 +4,7 @@ import * as memberProfileRepository from "../repositories/member-profile.reposit
 import * as userRepository from "../repositories/user.repository";
 import * as trainerProfileRepository from "../repositories/trainer-profile.repository";
 import { AppError } from "../errors/AppError";
+import { DayOfWeek } from "../models/class.model"; // ✅ import
 
 // ------------------------
 // TRANSFORM CLASS FOR FRONTEND
@@ -44,6 +45,8 @@ const transformClass = (cls: any) => {
     description: cls.description ?? "",
     schedule: cls.schedule,
     duration: `${cls.duration} min`,
+    recurrence: cls.recurrence ?? "none",
+    recurrenceDays: cls.recurrenceDays ?? [],
     trainer,
     pricing: cls.pricing,
     capacity: cls.capacity ?? 0,
@@ -59,6 +62,8 @@ export const createClass = async (data: {
   name: string;
   schedule: Date;
   duration: number;
+  recurrence: "none" | "daily" | "weekly" | "monthly";
+  recurrenceDays?: string[];
   description?: string;
   pricing: {
     oneTime?: number;
@@ -83,6 +88,8 @@ export const createClass = async (data: {
     name: data.name,
     schedule: data.schedule,
     duration: data.duration,
+    recurrence: data.recurrence,
+    recurrenceDays: data.recurrenceDays as DayOfWeek[], // ✅
     description: data.description,
     pricing: data.pricing,
     capacity: data.capacity,
@@ -117,6 +124,8 @@ export const updateClass = async (
     description?: string;
     schedule?: Date;
     duration?: number;
+    recurrence?: "none" | "daily" | "weekly" | "monthly";
+    recurrenceDays?: string[];
     pricing?: {
       oneTime?: number;
       weekly?: number;
@@ -142,6 +151,10 @@ export const updateClass = async (
     ...(data.description && { description: data.description }),
     ...(data.schedule && { schedule: data.schedule }),
     ...(data.duration !== undefined && { duration: data.duration }),
+    ...(data.recurrence && { recurrence: data.recurrence }),
+    ...(data.recurrenceDays && {
+      recurrenceDays: data.recurrenceDays as DayOfWeek[], // ✅
+    }),
     ...(data.pricing && { pricing: data.pricing }),
     ...(data.capacity !== undefined && { capacity: data.capacity }),
     ...(data.trainer && { trainer: new Types.ObjectId(data.trainer) }),
@@ -162,7 +175,6 @@ export const deleteClass = async (id: string) => {
   const scheduleDate = new Date(foundClass.schedule);
   const isCompleted = scheduleDate < now;
 
-  // ✅ Only block deletion if class is upcoming/ongoing AND has members
   if (!isCompleted && foundClass.members.length > 0) {
     throw new AppError(
       "Cannot delete a class with enrolled members. Please remove all members first.",
@@ -283,7 +295,6 @@ export const getClassMembers = async (
         requestingUserId,
       );
 
-    // ✅ Cast to any to handle populated trainer object
     const classDoc = foundClass as any;
     const classTrainerId =
       classDoc.trainer?._id?.toString() ?? classDoc.trainer?.toString();
@@ -302,11 +313,10 @@ export const getClassMembers = async (
     select: "userId avatar phone gender fitnessGoal isActive",
     populate: {
       path: "userId",
-      select: "name email role", // ✅ populate name and email
+      select: "name email role",
     },
   });
 
-  // ✅ Filter out non-members (trainers that got added)
   const membersOnly =
     (classWithMembers?.members as any[])?.filter(
       (m: any) => m.userId?.role === "member",

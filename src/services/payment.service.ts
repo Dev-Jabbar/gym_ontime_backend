@@ -37,7 +37,6 @@ type SubscriptionInterval =
   | "biannual"
   | "yearly";
 
-// ✅ Helper function to calculate end date
 const calculateEndDate = (
   startDate: Date,
   interval: SubscriptionInterval,
@@ -65,7 +64,6 @@ const calculateEndDate = (
   return endDate;
 };
 
-// ✅ NEW: Create checkout session with subscription support
 export const createCheckoutSession = async ({
   userId,
   classId,
@@ -87,6 +85,23 @@ export const createCheckoutSession = async ({
   const classItem = await ClassRepo.findClassById(classId);
   if (!classItem) throw new Error("Class not found");
 
+  // ✅ Block subscriptions for one-off classes
+  if (
+    paymentType === "subscription" &&
+    (classItem as any).recurrence === "none"
+  ) {
+    throw new Error(
+      "Subscriptions are not available for one-off classes. Please use one-time payment.",
+    );
+  }
+
+  // ✅ Block one-time payment for recurring classes
+  // (optional — allow one-time for recurring if you want members to try a session)
+  // Uncomment below if you want to enforce this:
+  // if (paymentType === "one-time" && (classItem as any).recurrence !== "none") {
+  //   throw new Error("One-time payment is not available for recurring classes. Please use a subscription.");
+  // }
+
   // ✅ Determine price based on payment type
   let amount: number;
 
@@ -96,7 +111,6 @@ export const createCheckoutSession = async ({
     }
     amount = classItem.pricing.oneTime;
   } else {
-    // Subscription
     if (!subscriptionInterval) {
       throw new Error(
         "Subscription interval is required for subscription payments",
@@ -182,7 +196,6 @@ export const createCheckoutSession = async ({
   };
 };
 
-// ✅ UPDATED: Verify payment with subscription support
 export const verifyPayment = async (reference: string) => {
   const { data } = await axios.get<PaystackVerifyResponse>(
     `${paystackBaseUrl}/transaction/verify/${reference}`,
@@ -207,7 +220,6 @@ export const verifyPayment = async (reference: string) => {
     return { message: "Payment already processed", payment };
   }
 
-  // ✅ Get member profile
   const memberProfile = await MemberProfileRepo.findMemberProfileByUserId(
     payment.user.toString(),
   );
@@ -216,9 +228,7 @@ export const verifyPayment = async (reference: string) => {
     throw new Error("Member profile not found for this user");
   }
 
-  // ✅ Handle subscription vs one-time
   if (payment.paymentType === "subscription" && payment.subscriptionInterval) {
-    // Create subscription
     const startDate = new Date();
     const endDate = calculateEndDate(startDate, payment.subscriptionInterval);
 
@@ -233,19 +243,16 @@ export const verifyPayment = async (reference: string) => {
       payment: payment._id,
     });
 
-    // Update payment with subscription link
     await PaymentRepo.updatePaymentByReference(reference, {
       status: "completed",
       subscription: subscription._id,
     });
   } else {
-    // One-time payment
     await PaymentRepo.updatePaymentByReference(reference, {
       status: "completed",
     });
   }
 
-  // ✅ Add member to class
   if (payment.class) {
     await ClassRepo.addMemberToClass(
       payment.class.toString(),
@@ -256,7 +263,6 @@ export const verifyPayment = async (reference: string) => {
   return { message: "Payment verified successfully", payment };
 };
 
-// ... rest of your service functions (getUserPayments, etc.)
 export const getUserPayments = async (userId: string) => {
   return PaymentRepo.findPaymentsByUserId(userId);
 };

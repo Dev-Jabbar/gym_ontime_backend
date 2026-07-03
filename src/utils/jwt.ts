@@ -13,7 +13,7 @@ export const signToken = (payload: TokenPayload): string => {
     JWT_CONFIG.secret, // ✅ plain string is VALID
     {
       expiresIn: JWT_CONFIG.expiresIn, // ✅ string like "7d" is VALID at runtime
-    } as any // ⬅️ silence broken typings
+    } as any, // ⬅️ silence broken typings
   );
 };
 

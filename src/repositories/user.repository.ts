@@ -39,7 +39,7 @@ export const findUserByEmail = async (email: string) => {
 };
 
 /**
- * FIND BY EMAIL (INCLUDING DELETED) ✅ ADD THIS
+ * FIND BY EMAIL (INCLUDING DELETED)
  */
 export const findUserByEmailIncludingDeleted = async (email: string) => {
   return UserModel.findOne({ email }); // No isActive filter

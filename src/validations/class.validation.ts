@@ -7,14 +7,25 @@ export const objectIdSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ObjectId");
 
-/**
- * 🔹 Create class (UPDATED with pricing)
- */
 export const createClassSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   schedule: z.coerce.date("Schedule is required and must be a valid date"),
-  duration: z.number().min(1, "Duration is required (in minutes)"), // ✅ add this
+  duration: z.number().min(1, "Duration is required (in minutes)"),
+  recurrence: z.enum(["none", "daily", "weekly", "monthly"]).default("none"),
+  recurrenceDays: z
+    .array(
+      z.enum([
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ]),
+    )
+    .optional(),
   pricing: z.object({
     oneTime: z.number().min(0).optional(),
     weekly: z.number().min(0).optional(),
@@ -26,15 +37,26 @@ export const createClassSchema = z.object({
   capacity: z.number().min(1, "Capacity must be at least 1").optional(),
 });
 
-/**
- * 🔹 Update class (all fields optional)
- */
 export const updateClassSchema = z
   .object({
     name: z.string().min(1).optional(),
     description: z.string().optional(),
     schedule: z.coerce.date().optional(),
-    duration: z.number().min(1).optional(), // ✅ add this
+    duration: z.number().min(1).optional(),
+    recurrence: z.enum(["none", "daily", "weekly", "monthly"]).optional(),
+    recurrenceDays: z
+      .array(
+        z.enum([
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+        ]),
+      )
+      .optional(),
     pricing: z
       .object({
         oneTime: z.number().min(0).optional(),
@@ -52,6 +74,7 @@ export const updateClassSchema = z
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",
   });
+
 /**
  * 🔹 Params validation
  */
