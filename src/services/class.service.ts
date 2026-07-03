@@ -26,6 +26,11 @@ const transformClass = (cls: any) => {
   const trainer = cls.trainer
     ? {
         id: cls.trainer._id?.toString() ?? "",
+        // The dropdown in Create/Edit modals is keyed by User._id (since
+        // that's what the admin trainer list is built on), while `id`
+        // above is the TrainerProfile._id. Exposing both avoids a
+        // mismatch when pre-selecting the current trainer in a <select>.
+        userId: cls.trainer.userId?._id?.toString() ?? "",
         name: cls.trainer.userId?.name ?? "Unknown Trainer",
         avatar:
           cls.trainer.avatar ??
@@ -35,6 +40,7 @@ const transformClass = (cls: any) => {
       }
     : {
         id: "",
+        userId: "",
         name: "Unassigned",
         avatar: `https://ui-avatars.com/api/?name=Unassigned&background=random&color=fff`,
       };
@@ -74,6 +80,8 @@ export const createClass = async (data: {
     yearly?: number;
   };
   capacity?: number;
+  // A User._id — same convention as assignTrainerToClass's userId param.
+  trainer: string;
 }) => {
   const existing = await classRepository.findByNameAndSchedule(
     data.name,
@@ -82,6 +90,23 @@ export const createClass = async (data: {
 
   if (existing) {
     throw new AppError("Class with same name and schedule already exists", 409);
+  }
+
+  // Resolve the trainer's User._id -> TrainerProfile._id, exactly the
+  // same validation + lookup assignTrainerToClass already does. Doing
+  // this in the service (not just the Zod schema) means an invalid or
+  // non-trainer userId is rejected with a clear error, not silently
+  // saved as a broken reference.
+  const trainerUser = await userRepository.findUserById(data.trainer);
+  if (!trainerUser) throw new AppError("Trainer user not found", 404);
+  if (trainerUser.role !== "trainer") {
+    throw new AppError("Assigned user is not a trainer", 400);
+  }
+
+  const trainerProfile =
+    await trainerProfileRepository.findTrainerProfileByUserId(data.trainer);
+  if (!trainerProfile) {
+    throw new AppError("Trainer profile not found for this user", 404);
   }
 
   return classRepository.createClass({
@@ -93,6 +118,7 @@ export const createClass = async (data: {
     description: data.description,
     pricing: data.pricing,
     capacity: data.capacity,
+    trainer: new Types.ObjectId(trainerProfile._id.toString()),
     members: [],
   });
 };
@@ -146,6 +172,29 @@ export const updateClass = async (
     throw new AppError("Cannot update a class that already happened", 400);
   }
 
+  // ⚠️ data.trainer, like createClass's, is a User._id — resolve it to
+  // the matching TrainerProfile._id before saving. Previously this just
+  // did `new Types.ObjectId(data.trainer)` directly, which silently
+  // stored the wrong ID type if a User._id was passed in (as the Edit
+  // modal now does, to stay consistent with the Create modal and the
+  // rest of the admin trainer-selection UI).
+  let resolvedTrainerId: Types.ObjectId | undefined;
+  if (data.trainer) {
+    const trainerUser = await userRepository.findUserById(data.trainer);
+    if (!trainerUser) throw new AppError("Trainer user not found", 404);
+    if (trainerUser.role !== "trainer") {
+      throw new AppError("Assigned user is not a trainer", 400);
+    }
+
+    const trainerProfile =
+      await trainerProfileRepository.findTrainerProfileByUserId(data.trainer);
+    if (!trainerProfile) {
+      throw new AppError("Trainer profile not found for this user", 404);
+    }
+
+    resolvedTrainerId = new Types.ObjectId(trainerProfile._id.toString());
+  }
+
   return classRepository.updateClass(id, {
     ...(data.name && { name: data.name }),
     ...(data.description && { description: data.description }),
@@ -157,7 +206,7 @@ export const updateClass = async (
     }),
     ...(data.pricing && { pricing: data.pricing }),
     ...(data.capacity !== undefined && { capacity: data.capacity }),
-    ...(data.trainer && { trainer: new Types.ObjectId(data.trainer) }),
+    ...(resolvedTrainerId && { trainer: resolvedTrainerId }),
     ...(data.members && {
       members: data.members.map((id: string) => new Types.ObjectId(id)),
     }),

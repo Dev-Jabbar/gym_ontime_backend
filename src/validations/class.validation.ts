@@ -35,6 +35,13 @@ export const createClassSchema = z.object({
     yearly: z.number().min(0).optional(),
   }),
   capacity: z.number().min(1, "Capacity must be at least 1").optional(),
+  // ⚠️ This is a User._id, not a TrainerProfile._id — same convention
+  // as assignTrainerParamsSchema's userId. The service layer resolves
+  // it to the matching TrainerProfile before saving, mirroring exactly
+  // what assignTrainerToClass already does. A class cannot be created
+  // without a trainer — enforced here (required, not .optional()) so
+  // hitting the API directly can't bypass the frontend's dropdown.
+  trainer: objectIdSchema.min(1, "A trainer must be assigned to this class"),
 });
 
 export const updateClassSchema = z
