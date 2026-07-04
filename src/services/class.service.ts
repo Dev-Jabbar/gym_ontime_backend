@@ -58,6 +58,7 @@ const transformClass = (cls: any) => {
     capacity: cls.capacity ?? 0,
     enrolled: cls.members?.length ?? 0,
     status,
+    image: cls.image ?? null,
   };
 };
 
@@ -82,6 +83,7 @@ export const createClass = async (data: {
   capacity?: number;
   // A User._id — same convention as assignTrainerToClass's userId param.
   trainer: string;
+  image?: string;
 }) => {
   const existing = await classRepository.findByNameAndSchedule(
     data.name,
@@ -118,6 +120,7 @@ export const createClass = async (data: {
     description: data.description,
     pricing: data.pricing,
     capacity: data.capacity,
+    image: data.image,
     trainer: new Types.ObjectId(trainerProfile._id.toString()),
     members: [],
   });
@@ -163,6 +166,7 @@ export const updateClass = async (
     capacity?: number;
     trainer?: string;
     members?: string[];
+    image?: string;
   },
 ) => {
   const foundClass = await classRepository.findClassById(id);
@@ -206,6 +210,7 @@ export const updateClass = async (
     }),
     ...(data.pricing && { pricing: data.pricing }),
     ...(data.capacity !== undefined && { capacity: data.capacity }),
+    ...(data.image !== undefined && { image: data.image }),
     ...(resolvedTrainerId && { trainer: resolvedTrainerId }),
     ...(data.members && {
       members: data.members.map((id: string) => new Types.ObjectId(id)),

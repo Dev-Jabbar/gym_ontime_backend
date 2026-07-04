@@ -29,6 +29,10 @@ export interface IClass {
     yearly?: number;
   };
   capacity?: number;
+  // ✅ Optional banner image (Cloudinary URL). A class card shows a
+  // compact banner at the top only when this is set — no image means
+  // the card renders exactly as before, no empty space.
+  image?: string;
 }
 
 const classSchema = new Schema<IClass>(
@@ -81,6 +85,10 @@ const classSchema = new Schema<IClass>(
         ref: "MemberProfile",
       },
     ],
+    image: {
+      type: String,
+      default: null,
+    },
   },
   { timestamps: true },
 );

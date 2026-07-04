@@ -35,6 +35,10 @@ export const createClassSchema = z.object({
     yearly: z.number().min(0).optional(),
   }),
   capacity: z.number().min(1, "Capacity must be at least 1").optional(),
+  // ✅ Optional Cloudinary URL for the class card's banner image.
+  // Optional on purpose — a class with no image renders fine, just
+  // without the banner.
+  image: z.string().url().optional(),
   // ⚠️ This is a User._id, not a TrainerProfile._id — same convention
   // as assignTrainerParamsSchema's userId. The service layer resolves
   // it to the matching TrainerProfile before saving, mirroring exactly
@@ -75,6 +79,7 @@ export const updateClassSchema = z
       })
       .optional(),
     capacity: z.number().min(1, "Capacity must be at least 1").optional(),
+    image: z.string().url().optional(),
     trainer: objectIdSchema.optional(),
     members: z.array(objectIdSchema).optional(),
   })
