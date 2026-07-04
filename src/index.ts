@@ -11,6 +11,8 @@ import trainerRoutes from "./routes/trainer-profile.routes";
 import memberRoutes from "./routes/member-profile.route";
 import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.route";
+import uploadRoutes from "./routes/upload.routes";
+import adminProfileRoutes from "./routes/admin-profile.routes";
 
 dotenv.config();
 
@@ -46,6 +48,8 @@ app.use("/api/trainers", trainerRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/uploads", uploadRoutes);
+app.use("/api/admins", adminProfileRoutes);
 
 // ❤️ Health check
 app.get("/", (_req, res) => {
