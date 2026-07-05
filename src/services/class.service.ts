@@ -5,6 +5,7 @@ import * as userRepository from "../repositories/user.repository";
 import * as trainerProfileRepository from "../repositories/trainer-profile.repository";
 import { AppError } from "../errors/AppError";
 import { DayOfWeek } from "../models/class.model"; // ✅ import
+import { getAvatarFallback } from "../utils/avatarFallback";
 
 // ------------------------
 // TRANSFORM CLASS FOR FRONTEND
@@ -34,15 +35,13 @@ const transformClass = (cls: any) => {
         name: cls.trainer.userId?.name ?? "Unknown Trainer",
         avatar:
           cls.trainer.avatar ??
-          `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            cls.trainer.userId?.name ?? "Trainer",
-          )}&background=random&color=fff`,
+          getAvatarFallback(cls.trainer.userId?.name ?? "Trainer"),
       }
     : {
         id: "",
         userId: "",
         name: "Unassigned",
-        avatar: `https://ui-avatars.com/api/?name=Unassigned&background=random&color=fff`,
+        avatar: getAvatarFallback("Unassigned"),
       };
 
   return {
