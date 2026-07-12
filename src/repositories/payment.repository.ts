@@ -153,3 +153,15 @@ export const getUserTotalSpending = async (userId: string) => {
 
   return result[0] || { total: 0, count: 0 };
 };
+
+/**
+ * FIND STALE PENDING PAYMENTS
+ * Used by the scheduled cleanup job to catch payments that never got
+ * a webhook or verify() call (e.g. abandoned checkout).
+ */
+export const findStalePendingPayments = async (olderThan: Date) => {
+  return PaymentModel.find({
+    status: "pending",
+    createdAt: { $lt: olderThan },
+  });
+};

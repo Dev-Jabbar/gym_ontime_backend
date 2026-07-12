@@ -12,10 +12,8 @@ export interface IPayment {
 
   status: "pending" | "completed" | "failed";
 
-  // ✅ NEW: Payment type
   paymentType: "one-time" | "subscription";
 
-  // ✅ NEW: Subscription interval (only if paymentType = "subscription")
   subscriptionInterval?:
     | "weekly"
     | "monthly"
@@ -23,18 +21,18 @@ export interface IPayment {
     | "biannual"
     | "yearly";
 
-  // Stripe fields
   stripeSessionId?: string;
   stripePaymentIntentId?: string;
 
-  // Paystack fields
   paystackReference?: string;
   paystackAccessCode?: string;
 
-  // ✅ NEW: Link to subscription (if applicable)
   subscription?: Types.ObjectId;
-}
 
+  // Added by { timestamps: true } in the schema
+  createdAt: Date;
+  updatedAt: Date;
+}
 const paymentSchema = new Schema<IPayment>(
   {
     user: {

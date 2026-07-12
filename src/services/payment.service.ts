@@ -95,14 +95,6 @@ export const createCheckoutSession = async ({
     );
   }
 
-  // ✅ Block one-time payment for recurring classes
-  // (optional — allow one-time for recurring if you want members to try a session)
-  // Uncomment below if you want to enforce this:
-  // if (paymentType === "one-time" && (classItem as any).recurrence !== "none") {
-  //   throw new Error("One-time payment is not available for recurring classes. Please use a subscription.");
-  // }
-
-  // ✅ Determine price based on payment type
   let amount: number;
 
   if (paymentType === "one-time") {
@@ -126,12 +118,10 @@ export const createCheckoutSession = async ({
     amount = price;
   }
 
-  // ✅ Check if class is full
   if (classItem.capacity && classItem.members.length >= classItem.capacity) {
     throw new Error("Class is full. No spots available.");
   }
 
-  // ✅ Check for existing enrollment
   if (paymentType === "one-time") {
     const existingPayment = await PaymentRepo.findCompletedPayment(
       userId,
@@ -150,7 +140,6 @@ export const createCheckoutSession = async ({
     }
   }
 
-  // ✅ Initialize Paystack transaction
   const { data } = await axios.post<PaystackInitializeResponse>(
     `${paystackBaseUrl}/transaction/initialize`,
     {
@@ -175,7 +164,6 @@ export const createCheckoutSession = async ({
     },
   );
 
-  // ✅ Save payment record
   await PaymentRepo.createPayment({
     user: userId as any,
     class: classId as any,
@@ -206,7 +194,22 @@ export const verifyPayment = async (reference: string) => {
     },
   );
 
+  // ⚠️ This is the fix. Paystack does not send a webhook event for a
+  // failed/declined charge — per their own docs, webhooks only fire
+  // "for a successful charge." This verify() call is the ONLY place
+  // in the whole flow that ever finds out about a failure. Previously
+  // this branch just threw an error and returned, leaving the payment
+  // record at status: "pending" forever — the exact bug that was
+  // reported (pending payments never resolving after a failed charge).
+  // Now it persists "failed" before throwing, so the record reflects
+  // reality and the Payments page's Pending/Failed counts are accurate.
   if (data.data.status !== "success") {
+    const payment = await PaymentRepo.findPaymentByReference(reference);
+    if (payment && payment.status === "pending") {
+      await PaymentRepo.updatePaymentByReference(reference, {
+        status: "failed",
+      });
+    }
     throw new Error("Payment verification failed");
   }
 

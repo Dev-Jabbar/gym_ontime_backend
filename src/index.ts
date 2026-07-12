@@ -13,6 +13,7 @@ import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.route";
 import uploadRoutes from "./routes/upload.routes";
 import adminProfileRoutes from "./routes/admin-profile.routes";
+import { startPaymentCleanupJob } from "./jobs/paymentCleanup.job";
 
 dotenv.config();
 
@@ -41,6 +42,9 @@ app.use(express.json());
 
 // ⚡ Database
 connectDB();
+
+// 🧹 Background jobs
+startPaymentCleanupJob();
 
 // 📡 API Routes
 app.use("/api/classes", classRoutes);

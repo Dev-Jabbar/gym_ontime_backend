@@ -20,6 +20,7 @@ export const protect = (roles?: string[]) => {
 
     try {
       const decoded = verifyToken(token);
+
       req.user = decoded;
 
       if (roles && !roles.includes(req.user.role)) {

@@ -20,6 +20,7 @@
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.19.2",
+    "node-cron": "^4.6.0",
     "paystack": "^2.0.1",
     "stripe": "^20.3.0",
     "zod": "^4.2.1"
@@ -31,6 +32,7 @@
     "@types/express": "^5.0.5",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.1.0",
+    "@types/node-cron": "^3.0.11",
     "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

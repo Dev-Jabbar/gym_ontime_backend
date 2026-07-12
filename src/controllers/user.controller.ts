@@ -41,6 +41,7 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const data = loginUserSchema.parse(req.body);
+
     const user = await userService.loginUser(data.email, data.password);
 
     // Set HTTP-only cookie
