@@ -5,7 +5,8 @@ import mongoose from "mongoose";
 
 const TRAINER_POPULATE = {
   path: "trainer",
-  select: "avatar userId",
+  select:
+    "avatar userId bio specialty phone experience certifications availability",
   populate: {
     path: "userId",
     select: "name",
@@ -111,12 +112,13 @@ export const removeTrainerFromClassesByUser = async (
 
 // Find classes by trainer ID
 export const findClassesByTrainerId = async (trainerId: string) => {
-  return ClassModel.find({ trainer: trainerId }).populate({
-    path: "trainer",
-    select: "avatar userId",
-    populate: {
-      path: "userId",
-      select: "name",
-    },
-  });
+  return ClassModel.find({ trainer: trainerId }).populate(TRAINER_POPULATE);
+};
+
+// Find classes a specific member is enrolled in — used by the admin
+// member-details view to show "classes joined".
+export const findClassesByMemberId = async (memberProfileId: string) => {
+  return ClassModel.find({ members: memberProfileId }).populate(
+    TRAINER_POPULATE,
+  );
 };

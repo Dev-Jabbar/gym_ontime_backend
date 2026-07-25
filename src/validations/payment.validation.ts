@@ -15,7 +15,7 @@ export const initiatePaymentSchema = z
     classId: objectIdSchema,
     paymentType: z.enum(["one-time", "subscription"]),
     subscriptionInterval: z
-      .enum(["weekly", "monthly", "quarterly", "biannual", "yearly"])
+      .enum(["weekly", "monthly", "threeMonths"])
       .optional(),
   })
   .refine(

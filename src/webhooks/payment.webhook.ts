@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import * as PaymentRepo from "../repositories/payment.repository";
 import * as ClassRepo from "../repositories/class.repository";
-import * as MemberProfileRepo from "../repositories/member-profile.repository"; // ✅ Add this
+import * as MemberProfileRepo from "../repositories/member-profile.repository";
+import * as NotificationService from "../services/notification.service";
 
 export const handlePaystackWebhook = async (
   signature: string,
@@ -43,6 +44,34 @@ export const handlePaystackWebhook = async (
           memberProfile._id.toString(), // ✅ Use MEMBER PROFILE ID
         );
       }
+
+      // ✅ Same notification trigger as verifyPayment() — this webhook
+      // is a SEPARATE path to "completed" (Paystack calling back
+      // directly rather than the user's own redirect), so it needs its
+      // own trigger. Both are idempotent against double-notifying: the
+      // `if (payment.status === "completed") return;` guard above
+      // means whichever path processes completion FIRST is the only
+      // one that ever reaches this point.
+      let className: string | null = null;
+      try {
+        const classDoc = await ClassRepo.findClassById(
+          payment.class.toString(),
+        );
+        className = classDoc?.name ?? null;
+      } catch {
+        className = null;
+      }
+
+      await NotificationService.notify({
+        userId: payment.user.toString(),
+        type: "payment_confirmed",
+        title: "Payment Confirmed",
+        message: className
+          ? `Your payment for "${className}" was successful.`
+          : "Your payment was successful.",
+        classId: payment.class.toString(),
+        paymentId: payment._id.toString(),
+      });
     }
   }
 };

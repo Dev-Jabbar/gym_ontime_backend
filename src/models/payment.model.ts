@@ -14,12 +14,7 @@ export interface IPayment {
 
   paymentType: "one-time" | "subscription";
 
-  subscriptionInterval?:
-    | "weekly"
-    | "monthly"
-    | "quarterly"
-    | "biannual"
-    | "yearly";
+  subscriptionInterval?: "weekly" | "monthly" | "threeMonths";
 
   stripeSessionId?: string;
   stripePaymentIntentId?: string;
@@ -85,7 +80,7 @@ const paymentSchema = new Schema<IPayment>(
     // ✅ NEW: Subscription interval
     subscriptionInterval: {
       type: String,
-      enum: ["weekly", "monthly", "quarterly", "biannual", "yearly"],
+      enum: ["weekly", "monthly", "threeMonths"],
     },
 
     // Stripe

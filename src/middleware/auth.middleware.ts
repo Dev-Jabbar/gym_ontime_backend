@@ -9,7 +9,7 @@ declare module "express-serve-static-core" {
 
 export const protect = (roles?: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    // Read from cookie instead of Authorization header
+    // Read from cookie
     const token = req.cookies?.token;
 
     if (!token) {

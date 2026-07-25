@@ -17,6 +17,18 @@ router.get("/", classController.getAllClasses);
 router.post("/", protect(["admin"]), classController.createClass);
 
 /**
+ * ADMIN ONLY - Get classes a specific member is enrolled in
+ * Used by the admin member-details view ("classes joined").
+ * ⚠️ MUST come before any "/:id" route below, or Express will try to
+ * match "by-member" itself as if it were a class ID.
+ */
+router.get(
+  "/by-member/:memberProfileId",
+  protect(["admin"]),
+  classController.getClassesByMemberController,
+);
+
+/**
  * PUBLIC - Get class member count
  * Members can see how full a class is (MUST come before /:id/members)
  */

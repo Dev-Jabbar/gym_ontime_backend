@@ -21,7 +21,6 @@ import {
  */
 export const initiatePayment = async (req: Request, res: Response) => {
   try {
-    // ✅ UPDATED: Now includes paymentType and subscriptionInterval
     const { classId, paymentType, subscriptionInterval } =
       initiatePaymentSchema.parse(req.body);
     const userId = req.user?.id;

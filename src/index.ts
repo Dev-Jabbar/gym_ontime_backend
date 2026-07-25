@@ -13,7 +13,9 @@ import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.route";
 import uploadRoutes from "./routes/upload.routes";
 import adminProfileRoutes from "./routes/admin-profile.routes";
+import notificationRoutes from "./routes/notification.routes";
 import { startPaymentCleanupJob } from "./jobs/paymentCleanup.job";
+import { startSubscriptionExpiryJob } from "./jobs/subscriptionExpiry.job";
 
 dotenv.config();
 
@@ -45,6 +47,7 @@ connectDB();
 
 // 🧹 Background jobs
 startPaymentCleanupJob();
+startSubscriptionExpiryJob();
 
 // 📡 API Routes
 app.use("/api/classes", classRoutes);
@@ -54,6 +57,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/uploads", uploadRoutes);
 app.use("/api/admins", adminProfileRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 // ❤️ Health check
 app.get("/", (_req, res) => {

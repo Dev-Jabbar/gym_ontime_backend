@@ -15,6 +15,8 @@ import { AppError } from "../errors/AppError";
  */
 export const createClass = async (req: Request, res: Response) => {
   try {
+    console.log("Request body for creating class:", req.body);
+
     const validatedData = createClassSchema.parse(req.body);
     const newClass = await classService.createClass(validatedData);
 
@@ -48,6 +50,24 @@ export const getAllClasses = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Get all classes error:", error);
     res.status(500).json({ message: "Failed to fetch classes" });
+  }
+};
+
+/**
+ * ✅ Get classes by member ID (Admin only)
+ * Used by the admin member-details view to show "classes joined".
+ */
+export const getClassesByMemberController = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const { memberProfileId } = req.params;
+    const classes = await classService.getClassesByMemberId(memberProfileId);
+    res.json({ success: true, data: classes });
+  } catch (error) {
+    console.error("Get classes by member error:", error);
+    res.status(500).json({ message: "Failed to fetch member's classes" });
   }
 };
 
@@ -172,7 +192,6 @@ export const deleteClass = async (req: Request, res: Response) => {
     }
 
     if (error instanceof AppError) {
-      // ✅ add this
       return res.status(error.statusCode).json({ message: error.message });
     }
 

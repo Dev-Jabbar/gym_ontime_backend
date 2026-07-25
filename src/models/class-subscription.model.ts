@@ -5,7 +5,7 @@ export interface IClassSubscription {
   memberProfile: Types.ObjectId;
   class: Types.ObjectId;
 
-  interval: "weekly" | "monthly" | "quarterly" | "biannual" | "yearly";
+  interval: "weekly" | "monthly" | "threeMonths";
   startDate: Date;
   endDate: Date;
 
@@ -25,7 +25,7 @@ const schema = new Schema<IClassSubscription>(
 
     interval: {
       type: String,
-      enum: ["weekly", "monthly", "quarterly", "biannual", "yearly"],
+      enum: ["weekly", "monthly", "threeMonths"],
       required: true,
     },
 

@@ -30,9 +30,7 @@ export const createClassSchema = z.object({
     oneTime: z.number().min(0).optional(),
     weekly: z.number().min(0).optional(),
     monthly: z.number().min(0).optional(),
-    quarterly: z.number().min(0).optional(),
-    biannual: z.number().min(0).optional(),
-    yearly: z.number().min(0).optional(),
+    threeMonths: z.number().min(0).optional(),
   }),
   capacity: z.number().min(1, "Capacity must be at least 1").optional(),
   // ✅ Optional Cloudinary URL for the class card's banner image.
@@ -73,9 +71,7 @@ export const updateClassSchema = z
         oneTime: z.number().min(0).optional(),
         weekly: z.number().min(0).optional(),
         monthly: z.number().min(0).optional(),
-        quarterly: z.number().min(0).optional(),
-        biannual: z.number().min(0).optional(),
-        yearly: z.number().min(0).optional(),
+        threeMonths: z.number().min(0).optional(),
       })
       .optional(),
     capacity: z.number().min(1, "Capacity must be at least 1").optional(),

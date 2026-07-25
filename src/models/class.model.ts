@@ -24,9 +24,7 @@ export interface IClass {
     oneTime?: number;
     weekly?: number;
     monthly?: number;
-    quarterly?: number;
-    biannual?: number;
-    yearly?: number;
+    threeMonths?: number;
   };
   capacity?: number;
   // ✅ Optional banner image (Cloudinary URL). A class card shows a
@@ -66,9 +64,7 @@ const classSchema = new Schema<IClass>(
       oneTime: { type: Number, min: 0 },
       weekly: { type: Number, min: 0 },
       monthly: { type: Number, min: 0 },
-      quarterly: { type: Number, min: 0 },
-      biannual: { type: Number, min: 0 },
-      yearly: { type: Number, min: 0 },
+      threeMonths: { type: Number, min: 0 },
     },
     capacity: {
       type: Number,

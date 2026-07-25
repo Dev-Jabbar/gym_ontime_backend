@@ -4,6 +4,7 @@ import * as UserRepo from "../repositories/user.repository";
 import * as ClassRepo from "../repositories/class.repository";
 import * as MemberProfileRepo from "../repositories/member-profile.repository";
 import * as SubscriptionRepo from "../repositories/class-subscription.repository";
+import * as NotificationService from "./notification.service";
 
 const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY as string;
 const paystackBaseUrl = "https://api.paystack.co";
@@ -30,12 +31,7 @@ interface PaystackVerifyResponse {
   };
 }
 
-type SubscriptionInterval =
-  | "weekly"
-  | "monthly"
-  | "quarterly"
-  | "biannual"
-  | "yearly";
+type SubscriptionInterval = "weekly" | "monthly" | "threeMonths";
 
 const calculateEndDate = (
   startDate: Date,
@@ -50,14 +46,8 @@ const calculateEndDate = (
     case "monthly":
       endDate.setMonth(endDate.getMonth() + 1);
       break;
-    case "quarterly":
+    case "threeMonths":
       endDate.setMonth(endDate.getMonth() + 3);
-      break;
-    case "biannual":
-      endDate.setMonth(endDate.getMonth() + 6);
-      break;
-    case "yearly":
-      endDate.setFullYear(endDate.getFullYear() + 1);
       break;
   }
 
@@ -75,6 +65,12 @@ export const createCheckoutSession = async ({
   paymentType: "one-time" | "subscription";
   subscriptionInterval?: SubscriptionInterval;
 }) => {
+  console.log("Creating checkout session with:", {
+    userId,
+    classId,
+    paymentType,
+    subscriptionInterval,
+  });
   const user = await UserRepo.findUserById(userId);
   if (!user) throw new Error("User not found");
 
@@ -84,7 +80,7 @@ export const createCheckoutSession = async ({
 
   const classItem = await ClassRepo.findClassById(classId);
   if (!classItem) throw new Error("Class not found");
-
+  console.log("Class item:", classItem); // Log the class item for debugging
   // ✅ Block subscriptions for one-off classes
   if (
     paymentType === "subscription" &&
@@ -110,6 +106,8 @@ export const createCheckoutSession = async ({
     }
 
     const price = classItem.pricing[subscriptionInterval];
+
+    console.log(`Price for ${subscriptionInterval} subscription:`, price); // Log the price for debugging
     if (!price || price === 0) {
       throw new Error(
         `This class does not support ${subscriptionInterval} subscriptions`,
@@ -127,6 +125,8 @@ export const createCheckoutSession = async ({
       userId,
       classId,
     );
+
+    console.log("Existing payment check:", existingPayment); // Log the existing payment for debugging
     if (existingPayment) {
       throw new Error("You are already enrolled in this class");
     }
@@ -262,6 +262,31 @@ export const verifyPayment = async (reference: string) => {
       memberProfile._id.toString(),
     );
   }
+
+  // ✅ Notify the member their payment went through. Fetching the class
+  // name for a friendlier message — falls back to a generic message if
+  // the class lookup fails for any reason, since a notification isn't
+  // worth failing the whole verification over.
+  let className: string | null = null;
+  if (payment.class) {
+    try {
+      const classDoc = await ClassRepo.findClassById(payment.class.toString());
+      className = classDoc?.name ?? null;
+    } catch {
+      className = null;
+    }
+  }
+
+  await NotificationService.notify({
+    userId: payment.user.toString(),
+    type: "payment_confirmed",
+    title: "Payment Confirmed",
+    message: className
+      ? `Your payment for "${className}" was successful.`
+      : "Your payment was successful.",
+    classId: payment.class?.toString(),
+    paymentId: payment._id.toString(),
+  });
 
   return { message: "Payment verified successfully", payment };
 };

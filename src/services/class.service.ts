@@ -8,6 +8,68 @@ import { DayOfWeek } from "../models/class.model"; // ✅ import
 import { getAvatarFallback } from "../utils/avatarFallback";
 
 // ------------------------
+// STATUS FOR RECURRING CLASSES (daily/weekly)
+// ------------------------
+// "Completed" doesn't make sense for a class that happens again next
+// week — the series itself doesn't end, only individual sessions do.
+// So recurring classes only ever get "upcoming" or "ongoing": ongoing
+// while today's session window is active, upcoming the rest of the
+// time (including in between sessions on non-class days, and on class
+// days before/after today's specific window).
+const getRecurringStatus = (
+  scheduleAnchor: Date,
+  durationMinutes: number,
+  recurrence: string,
+  recurrenceDays: string[],
+  now: Date,
+): "upcoming" | "ongoing" => {
+  // The series hasn't had its first occurrence yet at all.
+  if (now < scheduleAnchor) return "upcoming";
+
+  const dayNames = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
+  const todayName = dayNames[now.getDay()];
+
+  // Daily classes run every day; weekly classes only run on their
+  // selected recurrenceDays. ("monthly" recurrence exists on the model
+  // but isn't currently offered in the create/edit UI — treated like
+  // daily as a safe fallback since it's not actually reachable today.)
+  const isValidDayToday =
+    recurrence === "daily" ||
+    recurrence === "monthly" ||
+    (recurrence === "weekly" && recurrenceDays.includes(todayName));
+
+  if (!isValidDayToday) return "upcoming";
+
+  // Build today's session window using the anchor's time-of-day
+  // (schedule stores a full datetime — we reuse its hour/minute, just
+  // applied to today's date instead of the original anchor date).
+  const todaysSessionStart = new Date(now);
+  todaysSessionStart.setHours(
+    scheduleAnchor.getHours(),
+    scheduleAnchor.getMinutes(),
+    scheduleAnchor.getSeconds(),
+    0,
+  );
+  const todaysSessionEnd = new Date(
+    todaysSessionStart.getTime() + durationMinutes * 60000,
+  );
+
+  if (now >= todaysSessionStart && now <= todaysSessionEnd) {
+    return "ongoing";
+  }
+
+  return "upcoming";
+};
+
+// ------------------------
 // TRANSFORM CLASS FOR FRONTEND
 // ------------------------
 const transformClass = (cls: any) => {
@@ -16,12 +78,24 @@ const transformClass = (cls: any) => {
   const endTime = new Date(scheduleDate.getTime() + cls.duration * 60000);
 
   let status: "upcoming" | "ongoing" | "completed";
-  if (now < scheduleDate) {
-    status = "upcoming";
-  } else if (now >= scheduleDate && now <= endTime) {
-    status = "ongoing";
+
+  if (cls.recurrence === "none" || !cls.recurrence) {
+    // One-off classes — unchanged, this is the exact original logic.
+    if (now < scheduleDate) {
+      status = "upcoming";
+    } else if (now >= scheduleDate && now <= endTime) {
+      status = "ongoing";
+    } else {
+      status = "completed";
+    }
   } else {
-    status = "completed";
+    status = getRecurringStatus(
+      scheduleDate,
+      cls.duration,
+      cls.recurrence,
+      cls.recurrenceDays ?? [],
+      now,
+    );
   }
 
   const trainer = cls.trainer
@@ -36,12 +110,26 @@ const transformClass = (cls: any) => {
         avatar:
           cls.trainer.avatar ??
           getAvatarFallback(cls.trainer.userId?.name ?? "Trainer"),
+        // Extra profile fields for the class-details modal's expandable
+        // trainer view — undefined if not set, not an error.
+        bio: cls.trainer.bio ?? null,
+        specialty: cls.trainer.specialty ?? null,
+        phone: cls.trainer.phone ?? null,
+        experience: cls.trainer.experience ?? null,
+        certifications: cls.trainer.certifications ?? [],
+        availability: cls.trainer.availability ?? null,
       }
     : {
         id: "",
         userId: "",
         name: "Unassigned",
         avatar: getAvatarFallback("Unassigned"),
+        bio: null,
+        specialty: null,
+        phone: null,
+        experience: null,
+        certifications: [],
+        availability: null,
       };
 
   return {
@@ -75,9 +163,7 @@ export const createClass = async (data: {
     oneTime?: number;
     weekly?: number;
     monthly?: number;
-    quarterly?: number;
-    biannual?: number;
-    yearly?: number;
+    threeMonths?: number;
   };
   capacity?: number;
   // A User._id — same convention as assignTrainerToClass's userId param.
@@ -134,6 +220,15 @@ export const getAllClasses = async () => {
 };
 
 // ------------------------
+// GET CLASSES BY MEMBER ID
+// Used by the admin member-details view to show "classes joined".
+// ------------------------
+export const getClassesByMemberId = async (memberProfileId: string) => {
+  const classes = await classRepository.findClassesByMemberId(memberProfileId);
+  return classes.map(transformClass);
+};
+
+// ------------------------
 // GET CLASS BY ID
 // ------------------------
 export const getClassById = async (id: string) => {
@@ -158,9 +253,7 @@ export const updateClass = async (
       oneTime?: number;
       weekly?: number;
       monthly?: number;
-      quarterly?: number;
-      biannual?: number;
-      yearly?: number;
+      threeMonths?: number;
     };
     capacity?: number;
     trainer?: string;
@@ -171,7 +264,11 @@ export const updateClass = async (
   const foundClass = await classRepository.findClassById(id);
   if (!foundClass) throw new AppError("Class not found", 404);
 
-  if (foundClass.schedule < new Date()) {
+  // A recurring class's series doesn't end just because its original
+  // anchor date has passed — it's still actively happening on its
+  // recurrenceDays. This check only makes sense for one-off classes,
+  // where the single scheduled date genuinely is the whole event.
+  if (foundClass.recurrence === "none" && foundClass.schedule < new Date()) {
     throw new AppError("Cannot update a class that already happened", 400);
   }
 
@@ -245,7 +342,10 @@ export const addMemberToClass = async (classId: string, userId: string) => {
   const foundClass = await classRepository.findClassById(classId);
   if (!foundClass) throw new AppError("Class not found", 404);
 
-  if (foundClass.schedule < new Date()) {
+  // Same reasoning as updateClass — a recurring class keeps having new
+  // sessions, so its original anchor date being in the past doesn't
+  // mean there's nothing left to join.
+  if (foundClass.recurrence === "none" && foundClass.schedule < new Date()) {
     throw new AppError("Cannot join a past class", 400);
   }
 
@@ -312,7 +412,10 @@ export const assignTrainerToClass = async (classId: string, userId: string) => {
   const foundClass = await classRepository.findClassById(classId);
   if (!foundClass) throw new AppError("Class not found", 404);
 
-  if (foundClass.schedule < new Date()) {
+  // Same reasoning again — assigning/changing a trainer for an
+  // actively-recurring class should work regardless of its original
+  // anchor date.
+  if (foundClass.recurrence === "none" && foundClass.schedule < new Date()) {
     throw new AppError("Cannot assign trainer to past class", 400);
   }
 
