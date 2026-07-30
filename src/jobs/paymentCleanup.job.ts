@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import * as PaymentRepo from "../repositories/payment.repository";
 import { verifyPayment } from "../services/payment.service";
+import * as ClassRepo from "../repositories/class.repository";
 
 // How old a "pending" payment must be before we bother re-checking it —
 // gives a normal checkout flow (redirect, verify) plenty of time to
@@ -57,6 +58,10 @@ export const runPaymentCleanup = async () => {
       }
     }
   }
+  const releaseResult = await ClassRepo.releaseExpiredHolds();
+  console.log(
+    `🪑 Released expired seat holds on ${releaseResult.modifiedCount} class(es)`,
+  );
 
   console.log(
     `🧹 Cleanup complete — checked ${stalePayments.length} stale payment(s)`,

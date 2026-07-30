@@ -5,9 +5,15 @@ import * as ClassRepo from "../repositories/class.repository";
 import * as MemberProfileRepo from "../repositories/member-profile.repository";
 import * as SubscriptionRepo from "../repositories/class-subscription.repository";
 import * as NotificationService from "./notification.service";
+import { IClass } from "../models/class.model";
 
 const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY as string;
 const paystackBaseUrl = "https://api.paystack.co";
+
+// How long we hold a seat for someone who's started checkout but hasn't
+// paid yet. 15 minutes: long enough for a normal checkout, short enough
+// that an abandoned cart doesn't block the seat for long.
+const SEAT_HOLD_MINUTES = 15;
 
 interface PaystackInitializeResponse {
   status: boolean;
@@ -32,6 +38,12 @@ interface PaystackVerifyResponse {
 }
 
 type SubscriptionInterval = "weekly" | "monthly" | "threeMonths";
+
+const SUBSCRIPTION_INTERVALS: SubscriptionInterval[] = [
+  "weekly",
+  "monthly",
+  "threeMonths",
+];
 
 const calculateEndDate = (
   startDate: Date,
@@ -65,12 +77,24 @@ export const createCheckoutSession = async ({
   paymentType: "one-time" | "subscription";
   subscriptionInterval?: SubscriptionInterval;
 }) => {
-  console.log("Creating checkout session with:", {
-    userId,
-    classId,
-    paymentType,
-    subscriptionInterval,
-  });
+  if (!paystackSecretKey) {
+    throw new Error("Server misconfiguration: PAYSTACK_SECRET_KEY is not set");
+  }
+  if (!process.env.FRONTEND_URL) {
+    throw new Error("Server misconfiguration: FRONTEND_URL is not set");
+  }
+
+  if (paymentType === "subscription") {
+    if (!subscriptionInterval) {
+      throw new Error(
+        "Subscription interval is required for subscription payments",
+      );
+    }
+    if (!SUBSCRIPTION_INTERVALS.includes(subscriptionInterval)) {
+      throw new Error(`Invalid subscription interval: ${subscriptionInterval}`);
+    }
+  }
+
   const user = await UserRepo.findUserById(userId);
   if (!user) throw new Error("User not found");
 
@@ -78,14 +102,14 @@ export const createCheckoutSession = async ({
     throw new Error("Only members can enroll in paid classes");
   }
 
-  const classItem = await ClassRepo.findClassById(classId);
+  const memberProfile =
+    await MemberProfileRepo.findMemberProfileByUserId(userId);
+  if (!memberProfile) throw new Error("Member profile not found");
+
+  const classItem = (await ClassRepo.findClassById(classId)) as IClass | null;
   if (!classItem) throw new Error("Class not found");
-  console.log("Class item:", classItem); // Log the class item for debugging
-  // ✅ Block subscriptions for one-off classes
-  if (
-    paymentType === "subscription" &&
-    (classItem as any).recurrence === "none"
-  ) {
+
+  if (paymentType === "subscription" && classItem.recurrence === "none") {
     throw new Error(
       "Subscriptions are not available for one-off classes. Please use one-time payment.",
     );
@@ -94,21 +118,14 @@ export const createCheckoutSession = async ({
   let amount: number;
 
   if (paymentType === "one-time") {
-    if (!classItem.pricing.oneTime || classItem.pricing.oneTime === 0) {
+    const price = classItem.pricing.oneTime;
+    if (!price) {
       throw new Error("This class does not support one-time payments");
     }
-    amount = classItem.pricing.oneTime;
+    amount = price;
   } else {
-    if (!subscriptionInterval) {
-      throw new Error(
-        "Subscription interval is required for subscription payments",
-      );
-    }
-
-    const price = classItem.pricing[subscriptionInterval];
-
-    console.log(`Price for ${subscriptionInterval} subscription:`, price); // Log the price for debugging
-    if (!price || price === 0) {
+    const price = classItem.pricing[subscriptionInterval!];
+    if (!price) {
       throw new Error(
         `This class does not support ${subscriptionInterval} subscriptions`,
       );
@@ -116,17 +133,11 @@ export const createCheckoutSession = async ({
     amount = price;
   }
 
-  if (classItem.capacity && classItem.members.length >= classItem.capacity) {
-    throw new Error("Class is full. No spots available.");
-  }
-
   if (paymentType === "one-time") {
     const existingPayment = await PaymentRepo.findCompletedPayment(
       userId,
       classId,
     );
-
-    console.log("Existing payment check:", existingPayment); // Log the existing payment for debugging
     if (existingPayment) {
       throw new Error("You are already enrolled in this class");
     }
@@ -140,48 +151,123 @@ export const createCheckoutSession = async ({
     }
   }
 
-  const { data } = await axios.post<PaystackInitializeResponse>(
-    `${paystackBaseUrl}/transaction/initialize`,
-    {
-      email: user.email,
-      amount: amount * 100,
-      currency: "NGN",
-      callback_url: `${process.env.FRONTEND_URL}/payment-success`,
-      metadata: {
-        userId,
-        classId,
-        userName: user.name,
-        className: classItem.name,
-        paymentType,
-        subscriptionInterval,
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${paystackSecretKey}`,
-        "Content-Type": "application/json",
-      },
-    },
+  // --- Reserve the seat NOW, not just check-and-hope. This is the real
+  // capacity gate — it atomically holds the seat for SEAT_HOLD_MINUTES,
+  // so a second person starting checkout for the last spot gets turned
+  // away here instead of after they've already paid. ---
+  const reserved = await ClassRepo.reserveSeat(
+    classId,
+    memberProfile._id.toString(),
+    SEAT_HOLD_MINUTES,
   );
+  if (!reserved) {
+    throw new Error("Class is full. No spots available.");
+  }
 
-  await PaymentRepo.createPayment({
-    user: userId as any,
-    class: classId as any,
-    amount,
-    currency: "NGN",
-    paystackReference: data.data.reference,
-    paystackAccessCode: data.data.access_code,
-    status: "pending",
-    provider: "paystack",
-    method: "card",
-    paymentType,
-    subscriptionInterval,
-  });
+  let paystackData: PaystackInitializeResponse["data"];
+  try {
+    const { data } = await axios.post<PaystackInitializeResponse>(
+      `${paystackBaseUrl}/transaction/initialize`,
+      {
+        email: user.email,
+        amount: amount * 100,
+        currency: "NGN",
+        callback_url: `${process.env.FRONTEND_URL}/payment-success`,
+        metadata: {
+          userId,
+          classId,
+          userName: user.name,
+          className: classItem.name,
+          paymentType,
+          subscriptionInterval: subscriptionInterval ?? null,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${paystackSecretKey}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    paystackData = data.data;
+  } catch (err) {
+    // Paystack init failed — give the seat back immediately rather than
+    // making someone else wait 15 minutes for a hold that will never
+    // turn into a payment.
+    await ClassRepo.releaseSeat(classId, memberProfile._id.toString());
+    throw new Error(
+      `Failed to initialize payment with Paystack: ${
+        err instanceof Error ? err.message : "unknown error"
+      }`,
+    );
+  }
+
+  try {
+    await PaymentRepo.createPayment({
+      user: userId as any,
+      class: classId as any,
+      amount,
+      currency: "NGN",
+      paystackReference: paystackData.reference,
+      paystackAccessCode: paystackData.access_code,
+      status: "pending",
+      provider: "paystack",
+      method: "card",
+      paymentType,
+      subscriptionInterval,
+    });
+  } catch (err) {
+    // Same logic — Paystack has a session, but we couldn't record it, so
+    // there's no way this ever gets verified/confirmed. Release the seat
+    // rather than leave it locked for 15 minutes for nothing.
+    await ClassRepo.releaseSeat(classId, memberProfile._id.toString());
+    console.error(
+      `Orphaned Paystack session (no local payment record): reference=${paystackData.reference}`,
+      err,
+    );
+    throw new Error(
+      "Payment was initialized but could not be recorded. Please contact support with reference: " +
+        paystackData.reference,
+    );
+  }
 
   return {
-    checkoutUrl: data.data.authorization_url,
-    reference: data.data.reference,
+    checkoutUrl: paystackData.authorization_url,
+    reference: paystackData.reference,
   };
+};
+
+// Shared by verifyPayment() and the webhook handler. Turns an active seat
+// hold into a real member. Returns:
+//   "enrolled"          -> proceed with marking payment/subscription complete
+//   "already-enrolled"  -> not an error, treat as success (idempotent retry)
+//   "hold-expired"      -> the 15-min hold ran out before payment confirmed;
+//                          seat may have gone to someone else
+//   "class-full"        -> shouldn't normally happen given the hold system,
+//                          but kept as a fallback signal
+//   "error"             -> unexpected state, log for investigation
+export const claimSeat = async (
+  classId: string,
+  memberProfileId: string,
+): Promise<
+  "enrolled" | "already-enrolled" | "hold-expired" | "class-full" | "error"
+> => {
+  const updatedClass = await ClassRepo.confirmSeat(classId, memberProfileId);
+  if (updatedClass) return "enrolled";
+
+  const reason = await ClassRepo.getClassEnrollmentStatus(
+    classId,
+    memberProfileId,
+  );
+
+  if (
+    reason === "already-enrolled" ||
+    reason === "hold-expired" ||
+    reason === "class-full"
+  ) {
+    return reason;
+  }
+  return "error";
 };
 
 export const verifyPayment = async (reference: string) => {
@@ -194,27 +280,29 @@ export const verifyPayment = async (reference: string) => {
     },
   );
 
-  // ⚠️ This is the fix. Paystack does not send a webhook event for a
-  // failed/declined charge — per their own docs, webhooks only fire
-  // "for a successful charge." This verify() call is the ONLY place
-  // in the whole flow that ever finds out about a failure. Previously
-  // this branch just threw an error and returned, leaving the payment
-  // record at status: "pending" forever — the exact bug that was
-  // reported (pending payments never resolving after a failed charge).
-  // Now it persists "failed" before throwing, so the record reflects
-  // reality and the Payments page's Pending/Failed counts are accurate.
   if (data.data.status !== "success") {
     const payment = await PaymentRepo.findPaymentByReference(reference);
     if (payment && payment.status === "pending") {
       await PaymentRepo.updatePaymentByReference(reference, {
         status: "failed",
       });
+
+      // Payment failed — release the seat hold right away instead of
+      // making someone else wait out the full 15 minutes.
+      const memberProfile = await MemberProfileRepo.findMemberProfileByUserId(
+        payment.user.toString(),
+      );
+      if (memberProfile && payment.class) {
+        await ClassRepo.releaseSeat(
+          payment.class.toString(),
+          memberProfile._id.toString(),
+        );
+      }
     }
     throw new Error("Payment verification failed");
   }
 
   const payment = await PaymentRepo.findPaymentByReference(reference);
-
   if (!payment) {
     throw new Error("Payment record not found");
   }
@@ -226,11 +314,54 @@ export const verifyPayment = async (reference: string) => {
   const memberProfile = await MemberProfileRepo.findMemberProfileByUserId(
     payment.user.toString(),
   );
-
   if (!memberProfile) {
     throw new Error("Member profile not found for this user");
   }
 
+  let seatResult:
+    | "enrolled"
+    | "already-enrolled"
+    | "hold-expired"
+    | "class-full"
+    | "error" = "enrolled";
+
+  if (payment.class) {
+    seatResult = await claimSeat(
+      payment.class.toString(),
+      memberProfile._id.toString(),
+    );
+  }
+
+  if (seatResult === "hold-expired" || seatResult === "class-full") {
+    await PaymentRepo.updatePaymentByReference(reference, {
+      needsReview: true,
+    } as any); // requires `needsReview?: boolean` on IPayment
+
+    await NotificationService.notify({
+      userId: payment.user.toString(),
+      type: "payment_needs_review",
+      title: "Payment received, seat unavailable",
+      message:
+        seatResult === "hold-expired"
+          ? "Your payment took longer than your reserved spot allowed, and the seat may no longer be available. Our team will follow up shortly."
+          : "Your payment went through, but the class filled up before we could confirm your spot. Our team will follow up shortly.",
+      classId: payment.class?.toString(),
+      paymentId: payment._id.toString(),
+    });
+
+    return { message: "Payment received, seat unavailable", payment };
+  }
+
+  if (seatResult === "error") {
+    console.error(
+      `claimSeat returned "error" for payment ${payment._id} (class ${payment.class})`,
+    );
+    throw new Error(
+      "Payment verified but enrollment could not be confirmed. Please contact support.",
+    );
+  }
+
+  // seatResult is "enrolled" or "already-enrolled" — safe to finalize.
   if (payment.paymentType === "subscription" && payment.subscriptionInterval) {
     const startDate = new Date();
     const endDate = calculateEndDate(startDate, payment.subscriptionInterval);
@@ -256,17 +387,6 @@ export const verifyPayment = async (reference: string) => {
     });
   }
 
-  if (payment.class) {
-    await ClassRepo.addMemberToClass(
-      payment.class.toString(),
-      memberProfile._id.toString(),
-    );
-  }
-
-  // ✅ Notify the member their payment went through. Fetching the class
-  // name for a friendlier message — falls back to a generic message if
-  // the class lookup fails for any reason, since a notification isn't
-  // worth failing the whole verification over.
   let className: string | null = null;
   if (payment.class) {
     try {

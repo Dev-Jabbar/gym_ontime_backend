@@ -2,7 +2,7 @@ import { Schema, model, Types } from "mongoose";
 
 export type NotificationType =
   | "payment_confirmed"
-  | "class_booked"
+  | "payment_needs_review"
   | "class_reminder"
   | "trainer_assigned";
 
@@ -27,13 +27,14 @@ const notificationSchema = new Schema<INotification>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      index: true, // every query here filters by user — index it
+      // index moved to compound indexes below — see bottom of file
     },
 
     type: {
       type: String,
       enum: [
         "payment_confirmed",
+        "payment_needs_review",
         "class_booked",
         "class_reminder",
         "trainer_assigned",
@@ -54,7 +55,7 @@ const notificationSchema = new Schema<INotification>(
     read: {
       type: Boolean,
       default: false,
-      index: true, // "unread count" queries filter on this constantly
+      // index moved to compound indexes below — see bottom of file
     },
 
     relatedClass: {
@@ -69,5 +70,14 @@ const notificationSchema = new Schema<INotification>(
   },
   { timestamps: true },
 );
+
+// ✅ CHANGED — covers findByUserId({ user }).sort({ createdAt: -1 }),
+// avoids an in-memory sort since createdAt is part of the index
+notificationSchema.index({ user: 1, createdAt: -1 });
+
+// ✅ CHANGED — covers countUnread({ user, read: false }) and
+// markAllAsRead({ user, read: false }) as one compound lookup instead
+// of two separate single-field indexes
+notificationSchema.index({ user: 1, read: 1 });
 
 export default model<INotification>("Notification", notificationSchema);

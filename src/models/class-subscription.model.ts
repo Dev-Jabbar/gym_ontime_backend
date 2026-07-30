@@ -47,4 +47,11 @@ const schema = new Schema<IClassSubscription>(
   { timestamps: true },
 );
 
+// ✅ NEW — covers findActiveSubscription({ user, class, status })
+schema.index({ user: 1, class: 1, status: 1 });
+
+// ✅ NEW — covers findExpiredActiveSubscriptions({ status, endDate }),
+// used by the scheduled expiry job
+schema.index({ status: 1, endDate: 1 });
+
 export default model("ClassSubscription", schema);

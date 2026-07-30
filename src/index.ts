@@ -16,6 +16,7 @@ import adminProfileRoutes from "./routes/admin-profile.routes";
 import notificationRoutes from "./routes/notification.routes";
 import { startPaymentCleanupJob } from "./jobs/paymentCleanup.job";
 import { startSubscriptionExpiryJob } from "./jobs/subscriptionExpiry.job";
+import { startClassReminderJob } from "./jobs/classReminder.job";
 
 dotenv.config();
 
@@ -48,6 +49,7 @@ connectDB();
 // 🧹 Background jobs
 startPaymentCleanupJob();
 startSubscriptionExpiryJob();
+startClassReminderJob();
 
 // 📡 API Routes
 app.use("/api/classes", classRoutes);
