@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart TD
-    A[Member clicks book now] --> B["Hold placed: reserveSeat<br/>15-minute pendingMembers entry"]
+    A[Member clicks book now] --> B["Hold placed via reserveSeat<br/>15-minute pendingMembers entry"]
     B --> C[Member pays via Paystack]
     C --> D["Paid in time<br/>Hold still active"]
     C --> E["Paid late<br/>Hold already expired"]
