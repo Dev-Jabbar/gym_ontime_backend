@@ -53,10 +53,30 @@ export const deleteClass = async (id: string) => {
 
 // --- Add these to class.repository.ts ---
 
-// ✅ NEW — called when someone starts checkout. Grabs and holds a seat
-// for `ttlMinutes` if one's available. Returns the updated class doc if
-// the hold was placed, or null if the class is full (counting both
-// confirmed members AND other people's active holds).
+/**
+ * Atomically reserves a temporary seat hold for a class, if one is
+ * available. Called the moment a member starts checkout — the hold
+ * is what actually prevents two people paying for the same last seat.
+ *
+ * The capacity check and the write happen as a single MongoDB
+ * `findOneAndUpdate` call, not as a separate "check, then write" pair
+ * of queries. That's the whole point: with two separate steps, two
+ * concurrent requests could both pass the check before either one
+ * writes (a classic race condition). A single atomic operation closes
+ * that gap — only one caller's filter can still match by the time the
+ * write actually happens.
+ *
+ * Available capacity is calculated as confirmed `members` plus other
+ * people's still-unexpired `pendingMembers` — a class with unlimited
+ * capacity (`capacity: null`) skips this check entirely.
+ *
+ * @param classId - The class being booked.
+ * @param memberId - The member attempting to book.
+ * @param ttlMinutes - How long the hold lasts before it's considered
+ *   expired and up for grabs again.
+ * @returns The updated class document if the hold was placed, or
+ *   `null` if the class is full or the document doesn't exist.
+ */
 export const reserveSeat = async (
   classId: string,
   memberId: string,
@@ -117,8 +137,13 @@ export const reserveSeat = async (
   );
 };
 
-// ✅ NEW — frees a held seat immediately (payment failed / checkout
-// abandoned mid-flow / Paystack init errored after we'd already reserved).
+/**
+ * Immediately releases a member's seat hold, without waiting for it to
+ * expire naturally. Called when payment fails, checkout is abandoned
+ * mid-flow, or Paystack initialization errors out after a hold was
+ * already placed — in every case, holding the seat any longer would
+ * just block someone else from booking it for no reason.
+ */
 export const releaseSeat = async (classId: string, memberId: string) => {
   return ClassModel.findByIdAndUpdate(
     classId,
@@ -127,10 +152,20 @@ export const releaseSeat = async (classId: string, memberId: string) => {
   );
 };
 
-// ✅ NEW — payment confirmed: turns a hold into a real member. Only
-// succeeds if that member currently has an active (non-expired) hold —
-// this stops a payment confirming into a seat that already expired and
-// was potentially given to someone else.
+/**
+ * Converts a member's temporary hold into a confirmed seat, once
+ * payment has succeeded. Only matches if that member currently has an
+ * unexpired hold (`expiresAt` still in the future) — this is what
+ * stops a slow/delayed payment from confirming into a seat that
+ * already expired and may have been given to someone else in the
+ * meantime.
+ *
+ * @returns The updated class document if the hold was still valid and
+ *   got confirmed, or `null` if the hold had already expired (or never
+ *   existed) — callers should treat `null` as "seat no longer
+ *   available" and flag the payment for review rather than assume
+ *   success.
+ */
 export const confirmSeat = async (classId: string, memberId: string) => {
   const now = new Date();
   return ClassModel.findOneAndUpdate(
@@ -148,9 +183,16 @@ export const confirmSeat = async (classId: string, memberId: string) => {
   );
 };
 
-// ✅ NEW — bulk-release every expired hold, across all classes. Called by
-// the existing cleanup cron job for holds nobody ever confirmed or
-// explicitly released (abandoned checkout, browser closed, etc).
+/**
+ * Sweeps every class and removes any hold whose `expiresAt` has
+ * passed. This is the safety net for holds nobody ever confirmed or
+ * explicitly released — e.g. the user closed the browser mid-checkout.
+ * Without this, an abandoned hold would otherwise sit there until
+ * someone happened to book that exact class again.
+ *
+ * Run on a schedule by the payment cleanup cron job, not called
+ * directly from any request path.
+ */
 export const releaseExpiredHolds = async () => {
   const now = new Date();
   return ClassModel.updateMany(

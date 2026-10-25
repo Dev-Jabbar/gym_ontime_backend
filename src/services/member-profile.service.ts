@@ -20,7 +20,15 @@ interface MemberProfileData {
 }
 
 /**
- * CREATE MEMBER PROFILE
+ * Creates a member profile for a user — or, if one already exists but
+ * was previously soft-deleted (`isActive: false`), reactivates it with
+ * the newly supplied data instead of creating a second profile.
+ *
+ * This matters because `deleteMyMemberProfile` below never hard-deletes
+ * a profile document; it's kept around (inactive) so a returning member
+ * doesn't lose their history. Without this check, a user who deleted
+ * and later recreated their profile would end up with two documents
+ * for the same account.
  */
 export const createMemberProfile = async (
   user: IUser,
@@ -102,7 +110,15 @@ export const updateMyMemberProfile = async (
 };
 
 /**
- * DELETE MY MEMBER PROFILE
+ * Deletes a member's profile — really a soft delete: everything below
+ * runs inside a MongoDB transaction because it's two separate writes
+ * that must succeed or fail together. Removing the member from every
+ * class they're enrolled in, and marking their profile inactive
+ * (`memberRepository.deleteMemberProfileByUserId` flips `isActive` to
+ * `false` rather than removing the document — see that function's own
+ * comment), are not atomic on their own. Without a transaction, a
+ * crash between the two steps could leave a "ghost" member still
+ * counted toward a class's capacity with no profile behind it.
  */
 export const deleteMyMemberProfile = async (userId: string) => {
   const session = await mongoose.startSession();

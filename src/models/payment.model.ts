@@ -12,6 +12,12 @@ export interface IPayment {
 
   status: "pending" | "completed" | "failed";
 
+  // ✅ NEW: set when verifyPayment claims the seat and finds the hold
+  // expired or the class full — money was charged but the seat isn't
+  // secured, so the payment is held back from "completed" pending a
+  // human decision (refund vs. manual enroll).
+  needsReview: boolean;
+
   paymentType: "one-time" | "subscription";
 
   subscriptionInterval?: "weekly" | "monthly" | "threeMonths";
@@ -67,6 +73,16 @@ const paymentSchema = new Schema<IPayment>(
       type: String,
       enum: ["pending", "completed", "failed"],
       default: "pending",
+    },
+
+    // ✅ NEW: flags a charged payment whose seat hold expired or lost
+    // its spot before verifyPayment could confirm it. Kept separate
+    // from `status` so these don't get silently swept up by anything
+    // filtering on status: "pending" or "failed" — they need a human
+    // to look at them specifically.
+    needsReview: {
+      type: Boolean,
+      default: false,
     },
 
     // ✅ NEW: Payment type
@@ -128,5 +144,9 @@ paymentSchema.index({ class: 1, status: 1 });
 // ✅ NEW — covers findStalePendingPayments({ status: "pending", createdAt }),
 // used by the scheduled cleanup job
 paymentSchema.index({ status: 1, createdAt: 1 });
+
+// ✅ NEW — lets an admin dashboard pull every payment awaiting manual
+// review without a full collection scan.
+paymentSchema.index({ needsReview: 1, createdAt: -1 });
 
 export default model<IPayment>("Payment", paymentSchema);

@@ -76,6 +76,11 @@ export const updateMemberProfileByUserId = async (
 /**
  * ✅ SOFT DELETE BY USER ID (sets isActive: false)
  */
+// Despite the name, this is a soft delete — it flips `isActive` to
+// `false` rather than removing the document, so a returning member's
+// history and profile data are preserved (see `createMemberProfile`
+// in the service layer, which reactivates this instead of duplicating
+// it).
 export const deleteMemberProfileByUserId = (
   userId: string,
   session?: mongoose.ClientSession,
