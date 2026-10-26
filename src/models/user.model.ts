@@ -41,7 +41,7 @@ const userSchema = new Schema<IUser>(
       default: "member",
     },
 
-    // 🔥 SOFT DELETE FIELDS
+    // Soft delete fields.
     isActive: {
       type: Boolean,
       default: true,
@@ -56,7 +56,7 @@ const userSchema = new Schema<IUser>(
   { timestamps: true },
 );
 
-// Hash password
+// Hash the password before saving.
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
@@ -65,7 +65,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Compare password
+// Compare a candidate password with the stored hash.
 userSchema.methods.comparePassword = async function (
   candidatePassword: string,
 ): Promise<boolean> {

@@ -1,8 +1,11 @@
 import jwt from "jsonwebtoken";
 import { JWT_CONFIG } from "../config/jwtConfig";
 
-/** Decoded shape of every JWT this app issues. Kept minimal on purpose —
- * anything beyond identity/role belongs in a DB lookup, not the token. */
+/**
+ * Decoded shape of every JWT this app issues. Kept minimal on purpose:
+ * anything beyond identity and role belongs in a database lookup, not the
+ * token.
+ */
 export interface TokenPayload {
   id: string;
   role: string;
@@ -17,12 +20,12 @@ export interface TokenPayload {
 export const signToken = (payload: TokenPayload): string => {
   return jwt.sign(
     payload,
-    JWT_CONFIG.secret, // plain string is valid at runtime
+    JWT_CONFIG.secret, // A plain string secret is valid at runtime.
     {
-      expiresIn: JWT_CONFIG.expiresIn, // e.g. "7d" — valid at runtime
-    } as any, // @types/jsonwebtoken's overload doesn't accept a plain
-    // string secret + string expiresIn together, even though the
-    // library itself supports it — cast rather than fight the types.
+      expiresIn: JWT_CONFIG.expiresIn, // For example "7d"; valid at runtime.
+    } as any, // The cast is needed because @types/jsonwebtoken's overload does
+    // not accept a plain string secret together with a string expiresIn, even
+    // though the library supports it.
   );
 };
 

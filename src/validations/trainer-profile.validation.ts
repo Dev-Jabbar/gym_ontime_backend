@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-/** 🔹 Reusable Mongo ObjectId validation */
+/** Reusable Mongo ObjectId validation */
 export const objectIdSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ObjectId");
 
-/** 🔹 Create trainer profile */
+/** Create trainer profile */
 export const createTrainerSchema = z.object({
   avatar: z.string().url("Avatar must be a valid URL").optional(),
   bio: z.string().max(500, "Bio must be 500 characters or less").optional(),
@@ -18,14 +18,14 @@ export const createTrainerSchema = z.object({
   gender: z.enum(["male", "female", "prefer_not_to_say"]).optional(),
 });
 
-/** 🔹 Update trainer (all fields optional) */
+/** Update trainer (all fields optional) */
 export const updateTrainerSchema = createTrainerSchema
   .partial()
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",
   });
 
-/** 🔹 Params validation */
+/** Params validation */
 export const trainerIdParamSchema = z.object({
   id: objectIdSchema,
 });

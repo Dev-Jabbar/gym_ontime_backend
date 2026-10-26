@@ -4,7 +4,7 @@ import { protect } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
-// Public
+// Public.
 router.post("/register", userController.register);
 router.post("/login", userController.login);
 
@@ -12,7 +12,7 @@ router.post("/logout", userController.logout);
 
 router.get("/me", protect(), userController.getMe);
 
-// Admin only
+// Admin only.
 router.get("/", protect(["admin"]), userController.getAllUsers);
 
 router.post(
@@ -23,7 +23,7 @@ router.post(
 
 router.delete("/:id", protect(["admin"]), userController.deleteUser);
 
-// Admin or same user
+// Admin, or the user themselves.
 router.get("/:id", protect(), userController.getUserById);
 router.put("/:id", protect(), userController.updateUser);
 

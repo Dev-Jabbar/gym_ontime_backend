@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import UserModel from "../models/user.model";
-import AdminProfile from "../models/admin-profile.model"; // ✅ import
+import AdminProfile from "../models/admin-profile.model";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -13,7 +13,7 @@ const seedAdmin = async () => {
   const existingAdmin = await UserModel.findOne({ email: adminEmail });
 
   if (existingAdmin) {
-    // ✅ update profile even if admin already exists
+    // Update the profile even if the admin already exists.
     await AdminProfile.findOneAndUpdate(
       { userId: existingAdmin._id },
       { avatar: "/jabbar2.jpg" },
@@ -32,7 +32,7 @@ const seedAdmin = async () => {
 
   await AdminProfile.create({
     userId: admin._id,
-    avatar: "/jabbar2.jpg", // ✅ real photo from public folder
+    avatar: "/jabbar2.jpg", // A photo from the frontend's public folder.
   });
 
   console.log("🚀 Admin seeded successfully");

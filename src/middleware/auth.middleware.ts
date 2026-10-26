@@ -26,8 +26,8 @@ declare module "express-serve-static-core" {
  */
 export const protect = (roles?: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    // Cookie only — deliberately not also checking an Authorization
-    // header, so there's exactly one auth path to reason about.
+    // Cookie only. The Authorization header is deliberately not checked, so
+    // there is exactly one authentication path to reason about.
     const token = req.cookies?.token;
 
     if (!token) {
@@ -49,9 +49,8 @@ export const protect = (roles?: string[]) => {
 
       next();
     } catch (err) {
-      // Covers both a malformed/tampered signature and a naturally
-      // expired token — both are just "not a valid session" from the
-      // caller's point of view.
+      // Covers both a tampered signature and an expired token: either way
+      // it is not a valid session.
       return res.status(401).json({ message: "Unauthorized: Invalid token" });
     }
   };

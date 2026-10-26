@@ -16,10 +16,9 @@ export const findActiveSubscription = async (
 };
 
 /**
- * FIND EXPIRED ACTIVE SUBSCRIPTIONS
- * Used by the scheduled expiry job — any subscription still marked
- * "active" whose endDate has already passed needs to be flipped to
- * "expired" and have the member removed from the class.
+ * Finds subscriptions still marked "active" whose endDate has passed. The
+ * scheduled expiry job flips them to "expired" and removes the member from
+ * the class.
  */
 export const findExpiredActiveSubscriptions = async (now: Date) => {
   return ClassSubscription.find({
@@ -28,9 +27,7 @@ export const findExpiredActiveSubscriptions = async (now: Date) => {
   });
 };
 
-/**
- * UPDATE SUBSCRIPTION STATUS
- */
+/** Sets a subscription's status. */
 export const updateSubscriptionStatus = async (
   subscriptionId: string,
   status: "active" | "expired" | "cancelled",

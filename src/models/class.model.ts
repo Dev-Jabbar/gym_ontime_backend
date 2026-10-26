@@ -3,8 +3,8 @@ import { Schema, model, Types } from "mongoose";
 export type RecurrenceType = "none" | "daily" | "weekly" | "monthly";
 
 export interface IPendingMember {
-  member: Types.ObjectId; // MemberProfile id — same as `members` uses
-  expiresAt: Date; // hold auto-releases after this time
+  member: Types.ObjectId; // MemberProfile id, same as `members` uses.
+  expiresAt: Date; // The hold is released automatically after this time.
 }
 
 export type DayOfWeek =
@@ -22,7 +22,7 @@ export interface IClass {
   schedule: Date;
   duration: number;
   recurrence: RecurrenceType;
-  recurrenceDays?: DayOfWeek[]; // ✅
+  recurrenceDays?: DayOfWeek[];
   trainer?: Types.ObjectId;
   members: Types.ObjectId[];
   pendingMembers?: IPendingMember[];
@@ -33,15 +33,13 @@ export interface IClass {
     threeMonths?: number;
   };
   capacity?: number;
-  // ✅ Optional banner image (Cloudinary URL). A class card shows a
-  // compact banner at the top only when this is set — no image means
-  // the card renders exactly as before, no empty space.
+  // Optional banner image (Cloudinary URL). A class card shows a compact
+  // banner only when this is set.
   image?: string;
-  // Tracks the last calendar day a "class starting soon" reminder was
-  // sent for this class. Needed because the reminder job runs every
-  // 15 minutes and a session's "starting within the hour" window
-  // spans multiple ticks — without this, a recurring class would get
-  // re-reminded 3-4 times during that same hour.
+  // The last calendar day a "class starting soon" reminder was sent. Needed
+  // because the reminder job runs every 15 minutes and a session's "starting
+  // within the hour" window spans several runs; without it a recurring class
+  // would be reminded 3 or 4 times in the same hour.
   lastReminderSentAt?: Date;
 }
 
@@ -59,7 +57,6 @@ const classSchema = new Schema<IClass>(
     },
     recurrenceDays: [
       {
-        // ✅
         type: String,
         enum: [
           "monday",
@@ -117,20 +114,19 @@ const classSchema = new Schema<IClass>(
   { timestamps: true },
 );
 
-// Prevents the same member being added to the same class twice (data
-// integrity guard — see findByIdAndUpdate $addToSet usage in the repo,
-// this is the DB-level backstop for that).
+// Prevents the same member being added to a class twice. This is the
+// database-level backstop for the $addToSet usage in the repository.
 classSchema.index(
   { _id: 1, members: 1 },
   { unique: true, partialFilterExpression: { members: { $exists: true } } },
 );
 
-// ✅ speeds up findClassesByTrainerId({ trainer })
+// Speeds up findClassesByTrainerId({ trainer }).
 classSchema.index({ trainer: 1 });
 
-// ✅ speeds up findClassesByMemberId({ members }); the compound
-// index above can't serve this since it's keyed on { _id, members },
-// not { members } alone.
+// Speeds up findClassesByMemberId({ members }). The compound index above
+// cannot serve it, because it is keyed on { _id, members }, not { members }
+// alone.
 classSchema.index({ members: 1 });
 
 export default model<IClass>("Class", classSchema);

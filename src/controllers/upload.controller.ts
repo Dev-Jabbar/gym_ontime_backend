@@ -5,15 +5,15 @@ import cloudinary from "../config/cloudinary";
  * Generates a signed upload signature for the authenticated user.
  *
  * How the signed flow works:
- * 1. Browser calls this endpoint (with auth cookie) to get a signature.
- * 2. Browser uploads the file directly to Cloudinary's API, attaching
- *    that signature + timestamp + api_key + folder.
- * 3. Cloudinary verifies the signature server-side using the same
- *    secret this endpoint used to generate it — proving the request
- *    was authorized by *our* backend, not forged by a random client.
+ * 1. The browser calls this endpoint (with its auth cookie) to get a
+ *    signature.
+ * 2. The browser uploads the file directly to Cloudinary, attaching the
+ *    signature, timestamp, api_key and folder.
+ * 3. Cloudinary verifies the signature with the same secret this endpoint
+ *    used, proving the request was authorized by this backend.
  *
- * The API secret (CLOUDINARY_API_SECRET) is used here, in Node, and
- * is never sent to or visible from the browser at any point.
+ * The API secret (CLOUDINARY_API_SECRET) is only used here, on the server,
+ * and is never sent to the browser.
  */
 export const getUploadSignature = async (req: Request, res: Response) => {
   try {
@@ -24,10 +24,9 @@ export const getUploadSignature = async (req: Request, res: Response) => {
     const timestamp = Math.round(Date.now() / 1000);
     const folder = "avatars";
 
-    // Every parameter included here MUST be sent back with the actual
-    // upload request later, exactly as-is — Cloudinary re-derives the
-    // signature from whatever params arrive and compares it to this
-    // one. Mismatched or missing params (even an extra one) => rejected.
+    // Every parameter signed here must be sent back with the upload request
+    // exactly as is. Cloudinary re-derives the signature from the parameters
+    // it receives, so a missing, changed or extra parameter is rejected.
     const paramsToSign = {
       timestamp,
       folder,

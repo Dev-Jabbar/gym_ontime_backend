@@ -1,13 +1,12 @@
 /**
- * Creates the 60 classes only. Assumes trainers already exist.
+ * Creates the 60 seed classes. Assumes the trainers already exist.
  *
  * Flow:
  *   1. Log in as admin.
- *   2. GET /users (admin-only) to list every user, filter down to
- *      the trainer emails we need, and pull their _id — no trainer
- *      passwords required.
- *   3. POST /classes for all 60 classes, referencing each trainer's
- *      user _id from step 2.
+ *   2. GET /users (admin only), keep the trainers we need and read their
+ *      _id, so no trainer passwords are required.
+ *   3. POST /classes for all 60 classes, referencing each trainer's user
+ *      _id from step 2.
  *
  * Requires Node 18+ (built-in fetch). Run with:
  *   node src/seed/create_classes.js
@@ -15,8 +14,10 @@
 
 const CONFIG = {
   apiBase: "http://localhost:5000/api",
-  adminEmail: "momohabduljabbar@gmail.com", // your real admin login
-  adminPassword: "Admin12345", // your real admin password
+  // Admin account used to create the classes. Use a local development
+  // account only; do not commit real credentials.
+  adminEmail: "momohabduljabbar@gmail.com",
+  adminPassword: "Admin12345",
 };
 
 let cookieHeader = "";
@@ -59,8 +60,8 @@ async function login(email, password) {
   });
 }
 
-// Handles whatever shape GET /users returns (raw array, {users:[...]},
-// or {data:[...]}) without needing to know the controller's exact format.
+// Handles whatever shape GET /users returns (a raw array, {users: [...]} or
+// {data: [...]}), so it does not depend on the controller's exact format.
 function extractUserArray(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.users)) return payload.users;
@@ -90,9 +91,7 @@ async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// ---------------------------------------------------------------
-// TRAINER EMAILS (just enough to resolve ids)
-// ---------------------------------------------------------------
+// Trainer emails (just enough to resolve their ids).
 
 const TRAINER_EMAILS = [
   "noah.schmidt@gymontime.com",
@@ -112,9 +111,7 @@ const TRAINER_EMAILS = [
   "blessing.eze@gymontime.com",
 ];
 
-// ---------------------------------------------------------------
-// CLASSES (trainer referenced by EMAIL, resolved to id at runtime)
-// ---------------------------------------------------------------
+// Classes (each trainer is referenced by email and resolved to an id at runtime).
 
 const CLASSES = [
   {
@@ -809,9 +806,7 @@ const CLASSES = [
   },
 ];
 
-// ---------------------------------------------------------------
-// HELPERS
-// ---------------------------------------------------------------
+// Helpers
 
 function buildScheduleISO(time, daysFromNow) {
   const [hours, minutes] = time.split(":").map(Number);
@@ -821,9 +816,7 @@ function buildScheduleISO(time, daysFromNow) {
   return date.toISOString();
 }
 
-// ---------------------------------------------------------------
-// MAIN
-// ---------------------------------------------------------------
+// Main
 
 async function main() {
   console.log("Logging in as admin...");

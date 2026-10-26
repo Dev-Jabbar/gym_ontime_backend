@@ -15,8 +15,8 @@ export const countUnread = async (userId: string) => {
 };
 
 export const markAsRead = async (notificationId: string, userId: string) => {
-  // Scoped to userId too — a user should only ever be able to mark
-  // their OWN notifications as read, not guess another user's ID.
+  // Scoped to userId as well, so a user can only mark their own
+  // notifications as read and cannot guess another user's id.
   return NotificationModel.findOneAndUpdate(
     { _id: notificationId, user: userId },
     { read: true },

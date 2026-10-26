@@ -1,15 +1,11 @@
 import { z } from "zod";
 
-/**
- * 🔹 Reusable Mongo ObjectId validation
- */
+/** Reusable MongoDB ObjectId validation. */
 export const objectIdSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ObjectId");
 
-/**
- * 🔹 Create member profile
- */
+/** Body for creating a member profile. */
 export const createMemberSchema = z.object({
   avatar: z.string().url("Avatar must be a valid URL").optional(),
   phone: z.string().optional(),
@@ -33,25 +29,19 @@ export const createMemberSchema = z.object({
     .optional(),
 });
 
-/**
- * 🔹 Update member profile (all fields optional)
- */
+/** Body for updating a member profile (all fields optional). */
 export const updateMemberSchema = createMemberSchema
   .partial()
   .refine((data) => Object.keys(data).length > 0, {
     message: "At least one field must be provided",
   });
 
-/**
- * 🔹 Params validation (by member _id)
- */
+/** Route params: member profile id. */
 export const memberIdParamSchema = z.object({
   id: objectIdSchema,
 });
 
-/**
- * 🔹 Params validation by userId
- */
+/** Route params: user id. */
 export const memberUserIdParamSchema = z.object({
   userId: objectIdSchema,
 });

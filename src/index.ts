@@ -5,7 +5,7 @@ import connectDB from "./config/db";
 
 import cookieParser from "cookie-parser";
 
-// 🛣 Routes
+// Routes
 import classRoutes from "./routes/class.routes";
 import trainerRoutes from "./routes/trainer-profile.routes";
 import memberRoutes from "./routes/member-profile.route";
@@ -22,7 +22,7 @@ dotenv.config();
 
 const app = express();
 
-// 🧠 Global Middleware
+// Global middleware
 
 app.use(
   cors({
@@ -37,21 +37,21 @@ app.use(
 
 app.use(cookieParser());
 
-// ⚠️ IMPORTANT: Raw body for webhook signature verification
-// This MUST come BEFORE express.json()
+// The webhook route needs the raw request body for signature verification,
+// so this must be registered before express.json().
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 
 app.use(express.json());
 
-// ⚡ Database
+// Database
 connectDB();
 
-// 🧹 Background jobs
+// Background jobs
 startPaymentCleanupJob();
 startSubscriptionExpiryJob();
 startClassReminderJob();
 
-// 📡 API Routes
+// API routes
 app.use("/api/classes", classRoutes);
 app.use("/api/trainers", trainerRoutes);
 app.use("/api/members", memberRoutes);
@@ -61,12 +61,12 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/admins", adminProfileRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// ❤️ Health check
+// Health check
 app.get("/", (_req, res) => {
   res.send("API is running 🚀");
 });
 
-// 🚀 Server
+// Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);

@@ -4,14 +4,10 @@ import { protect } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
-/**
- * PUBLIC
- */
+// Public.
 router.get("/", trainerProfileController.getAllTrainerProfiles);
 
-/**
- * TRAINER (own profile)
- */
+// Trainer: own profile.
 router.post(
   "/profile",
   protect(["trainer"]),
@@ -41,9 +37,7 @@ router.get(
   protect(["trainer"]),
   trainerProfileController.getMyClasses,
 );
-/**
- * PUBLIC
- */
+// Public.
 router.get("/:id", trainerProfileController.getTrainerProfileById);
 
 export default router;

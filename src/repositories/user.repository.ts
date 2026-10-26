@@ -1,9 +1,7 @@
 import UserModel, { IUser } from "../models/user.model";
 import mongoose from "mongoose";
 
-/**
- * CREATE
- */
+/** Creates a user. */
 export const createUser = async (data: Partial<IUser>) => {
   return UserModel.create({
     ...data,
@@ -12,16 +10,12 @@ export const createUser = async (data: Partial<IUser>) => {
   });
 };
 
-/**
- * FIND ALL (ONLY ACTIVE)
- */
+/** Lists all active users. */
 export const findAllUsers = async () => {
   return UserModel.find({ isActive: true }).select("-password");
 };
 
-/**
- * FIND BY ID (ONLY ACTIVE, supports transactions)
- */
+/** Finds an active user by id (supports transactions). */
 export const findUserById = async (
   id: string,
   session?: mongoose.ClientSession,
@@ -31,23 +25,17 @@ export const findUserById = async (
     .select("-password");
 };
 
-/**
- * FIND BY EMAIL (ONLY ACTIVE)
- */
+/** Finds an active user by email. */
 export const findUserByEmail = async (email: string) => {
   return UserModel.findOne({ email, isActive: true });
 };
 
-/**
- * FIND BY EMAIL (INCLUDING DELETED)
- */
+/** Finds a user by email, including soft-deleted users. */
 export const findUserByEmailIncludingDeleted = async (email: string) => {
   return UserModel.findOne({ email }); // No isActive filter
 };
 
-/**
- * UPDATE (supports transactions)
- */
+/** Updates a user (supports transactions). */
 export const updateUser = async (
   id: string,
   data: Partial<IUser>,
@@ -60,9 +48,7 @@ export const updateUser = async (
   });
 };
 
-/**
- * 🔥 SOFT DELETE USER (MAIN DELETE FLOW)
- */
+/** Soft-deletes a user: the normal way a user is removed. */
 export const softDeleteUser = async (
   userId: string,
   session?: mongoose.ClientSession,
@@ -77,9 +63,7 @@ export const softDeleteUser = async (
   );
 };
 
-/**
- * ❌ HARD DELETE USER (INTERNAL / CLEANUP ONLY)
- */
+/** Permanently deletes a user. Internal and cleanup use only. */
 export const deleteUser = (
   userId: string,
   session?: mongoose.ClientSession,

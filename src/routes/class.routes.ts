@@ -4,61 +4,41 @@ import { protect } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
-/**
- * PUBLIC
- * Anyone can view classes
- */
+// Public: anyone can view classes.
 router.get("/", classController.getAllClasses);
 
-/**
- * ADMIN ONLY
- * Admin manages class lifecycle
- */
+// Admin only: creates classes.
 router.post("/", protect(["admin"]), classController.createClass);
 
-/**
- * ADMIN ONLY - Get classes a specific member is enrolled in
- * Used by the admin member-details view ("classes joined").
- * ⚠️ MUST come before any "/:id" route below, or Express will try to
- * match "by-member" itself as if it were a class ID.
- */
+// Admin only: classes a specific member is enrolled in (admin member-details
+// view, "classes joined"). Must be declared before any "/:id" route, or
+// "by-member" would be matched as a class id.
 router.get(
   "/by-member/:memberProfileId",
   protect(["admin"]),
   classController.getClassesByMemberController,
 );
 
-/**
- * PUBLIC - Get class member count
- * Members can see how full a class is (MUST come before /:id/members)
- */
+// Public: how full a class is. Declared before /:id/members.
 router.get("/:id/member-count", classController.getClassMemberCount);
 
-/**
- * TRAINER/ADMIN - Get members in a class (full details, no payment info)
- * IMPORTANT: This must come BEFORE /:id to avoid route conflicts
- */
+// Trainer or admin: members of a class (full details, no payment info).
+// Must be declared before /:id to avoid route conflicts.
 router.get(
   "/:id/members",
   protect(["trainer", "admin"]),
   classController.getClassMembers,
 );
 
-/**
- * PUBLIC - Get class by ID
- */
+// Public: one class by id.
 router.get("/:id", classController.getClassById);
 
-/**
- * ADMIN ONLY - Update/Delete
- */
+// Admin only: update and delete.
 router.put("/:id", protect(["admin"]), classController.updateClass);
 router.delete("/:id", protect(["admin"]), classController.deleteClass);
 
-/**
- * MEMBER MANAGEMENT
- * Admin controls enrollment (userId = user with "member" role)
- */
+// Member management: the admin controls enrollment (userId is a user with
+// the "member" role).
 router.post(
   "/:id/members/:userId",
   protect(["admin"]),
@@ -71,10 +51,8 @@ router.delete(
   classController.removeMemberFromClass,
 );
 
-/**
- * TRAINER MANAGEMENT
- * Only admin assigns trainers (userId = user with "trainer" role)
- */
+// Trainer management: only the admin assigns trainers (userId is a user with
+// the "trainer" role).
 router.put(
   "/:id/trainer/:userId",
   protect(["admin"]),

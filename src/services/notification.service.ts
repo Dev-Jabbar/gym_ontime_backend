@@ -51,9 +51,8 @@ export const notify = async ({
       ...(paymentId && { relatedPayment: paymentId as any }),
     });
   } catch (err) {
-    // A notification failing to save should NEVER break the actual
-    // action that triggered it (e.g. a payment completing). Log and
-    // move on rather than throw.
+    // A notification failing to save must never break the action that
+    // triggered it (for example a payment completing). Log it and move on.
     console.error("Failed to create notification:", err);
   }
 };

@@ -13,9 +13,7 @@ import {
 } from "../validations/user.validation";
 import { AppError } from "../errors/AppError";
 
-/**
- * ✅ Register (PUBLIC)
- */
+/** Registers a new user (public). */
 export const register = async (req: Request, res: Response) => {
   try {
     const data = registerUserSchema.parse(req.body);
@@ -35,24 +33,22 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Login (PUBLIC)
- */
+/** Logs a user in and sets the token cookie (public). */
 export const login = async (req: Request, res: Response) => {
   try {
     const data = loginUserSchema.parse(req.body);
 
     const user = await userService.loginUser(data.email, data.password);
 
-    // Set HTTP-only cookie
+    // Set the HTTP-only cookie.
     res.cookie("token", user.token, {
       httpOnly: true,
       secure: true,
       sameSite: "none",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days, in milliseconds
     });
 
-    // Send user info but NOT the token
+    // Send the user info, but not the token.
     res.json({
       id: user.id,
       name: user.name,
@@ -70,9 +66,7 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Get current logged-in user (AUTHENTICATED)
- */
+/** Returns the logged-in user. */
 export const getMe = async (req: Request, res: Response) => {
   try {
     const user = await userService.getUserById(req.user!.id);
@@ -87,7 +81,7 @@ export const getMe = async (req: Request, res: Response) => {
       avatar = await trainerProfileService.getTrainerAvatar(req.user!.id);
     }
 
-    // ✅ convert Mongoose document to plain object
+    // Convert the Mongoose document to a plain object.
     res.json({
       id: user._id,
       name: user.name,
@@ -102,9 +96,7 @@ export const getMe = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to fetch user" });
   }
 };
-/**
- * ✅ Logout (PUBLIC or AUTHENTICATED)
- */
+/** Clears the token cookie. */
 export const logout = async (_req: Request, res: Response) => {
   res.clearCookie("token", {
     httpOnly: true,
@@ -114,9 +106,7 @@ export const logout = async (_req: Request, res: Response) => {
   res.json({ message: "Logged out successfully" });
 };
 
-/**
- * ✅ Get all users (ADMIN ONLY)
- */
+/** Lists all users (admin). */
 export const getAllUsers = async (_req: Request, res: Response) => {
   try {
     const users = await userService.getAllUsers();
@@ -126,14 +116,12 @@ export const getAllUsers = async (_req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Get user by ID (ADMIN or SAME USER)
- */
+/** Returns a user (admin, or the user themselves). */
 export const getUserById = async (req: Request, res: Response) => {
   try {
     const { id } = userIdParamSchema.parse(req.params);
 
-    // 🔐 Authorization check
+    // Authorization: admin, or the user themselves.
     if (req.user?.role !== "admin" && req.user?.id !== id) {
       return res.status(403).json({ message: "Access denied" });
     }
@@ -149,15 +137,13 @@ export const getUserById = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Update user (ADMIN or SAME USER)
- */
+/** Updates a user (admin, or the user themselves). */
 export const updateUser = async (req: Request, res: Response) => {
   try {
     const { id } = userIdParamSchema.parse(req.params);
     const body = updateUserSchema.parse(req.body);
 
-    // 🔐 Authorization check
+    // Authorization: admin, or the user themselves.
     if (req.user?.role !== "admin" && req.user?.id !== id) {
       return res.status(403).json({ message: "Access denied" });
     }
@@ -173,14 +159,12 @@ export const updateUser = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Delete user (ADMIN ONLY)
- */
+/** Soft-deletes a user (admin). */
 export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = userIdParamSchema.parse(req.params);
 
-    // Extra safety (even though route is protected)
+    // Extra safety, even though the route is already protected.
     if (req.user?.role !== "admin") {
       return res.status(403).json({ message: "Access denied" });
     }

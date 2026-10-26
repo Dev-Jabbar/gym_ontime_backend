@@ -4,18 +4,17 @@ import * as memberProfileRepository from "../repositories/member-profile.reposit
 import * as userRepository from "../repositories/user.repository";
 import * as trainerProfileRepository from "../repositories/trainer-profile.repository";
 import { AppError } from "../errors/AppError";
-import { DayOfWeek } from "../models/class.model"; // ✅ import
+import { DayOfWeek } from "../models/class.model";
 import { getAvatarFallback } from "../utils/avatarFallback";
 
-// ------------------------
-// STATUS FOR RECURRING CLASSES (daily/weekly)
-// ------------------------
-// "Completed" doesn't make sense for a class that happens again next
-// week — the series itself doesn't end, only individual sessions do.
-// So recurring classes only ever get "upcoming" or "ongoing": ongoing
-// while today's session window is active, upcoming the rest of the
-// time (including in between sessions on non-class days, and on class
-// days before/after today's specific window).
+/**
+ * Computes the status of a recurring (daily or weekly) class. "Completed"
+ * makes no sense for a class that happens again next week: only individual
+ * sessions end, not the series. A recurring class is therefore either
+ * "ongoing" (while today's session window is active) or "upcoming" (the
+ * rest of the time, including between sessions and before or after today's
+ * window on a class day).
+ */
 const getRecurringStatus = (
   scheduleAnchor: Date,
   durationMinutes: number,
@@ -23,7 +22,7 @@ const getRecurringStatus = (
   recurrenceDays: string[],
   now: Date,
 ): "upcoming" | "ongoing" => {
-  // The series hasn't had its first occurrence yet at all.
+  // The series has not reached its first occurrence yet.
   if (now < scheduleAnchor) return "upcoming";
 
   const dayNames = [
@@ -37,10 +36,9 @@ const getRecurringStatus = (
   ];
   const todayName = dayNames[now.getDay()];
 
-  // Daily classes run every day; weekly classes only run on their
-  // selected recurrenceDays. ("monthly" recurrence exists on the model
-  // but isn't currently offered in the create/edit UI — treated like
-  // daily as a safe fallback since it's not actually reachable today.)
+  // Daily classes run every day; weekly classes run only on their selected
+  // recurrenceDays. "monthly" exists on the model but is not offered in the
+  // create/edit UI, so it is treated like daily as a safe fallback.
   const isValidDayToday =
     recurrence === "daily" ||
     recurrence === "monthly" ||
@@ -48,9 +46,8 @@ const getRecurringStatus = (
 
   if (!isValidDayToday) return "upcoming";
 
-  // Build today's session window using the anchor's time-of-day
-  // (schedule stores a full datetime — we reuse its hour/minute, just
-  // applied to today's date instead of the original anchor date).
+  // Build today's session window from the anchor's time of day. `schedule`
+  // stores a full datetime; its hour and minute are applied to today's date.
   const todaysSessionStart = new Date(now);
   todaysSessionStart.setHours(
     scheduleAnchor.getHours(),
@@ -69,9 +66,7 @@ const getRecurringStatus = (
   return "upcoming";
 };
 
-// ------------------------
-// TRANSFORM CLASS FOR FRONTEND
-// ------------------------
+/** Shapes a class document for the frontend. */
 const transformClass = (cls: any) => {
   const now = new Date();
   const scheduleDate = new Date(cls.schedule);
@@ -80,7 +75,7 @@ const transformClass = (cls: any) => {
   let status: "upcoming" | "ongoing" | "completed";
 
   if (cls.recurrence === "none" || !cls.recurrence) {
-    // One-off classes — unchanged, this is the exact original logic.
+    // One-off class: the status comes straight from its schedule and duration.
     if (now < scheduleDate) {
       status = "upcoming";
     } else if (now >= scheduleDate && now <= endTime) {
@@ -101,9 +96,8 @@ const transformClass = (cls: any) => {
   const trainer = cls.trainer
     ? {
         id: cls.trainer._id?.toString() ?? "",
-        // The dropdown in Create/Edit modals is keyed by User._id (since
-        // that's what the admin trainer list is built on), while `id`
-        // above is the TrainerProfile._id. Exposing both avoids a
+        // The create and edit modals key their trainer dropdown by User._id,
+        // while `id` above is the TrainerProfile._id. Exposing both avoids a
         // mismatch when pre-selecting the current trainer in a <select>.
         userId: cls.trainer.userId?._id?.toString() ?? "",
         name: cls.trainer.userId?.name ?? "Unknown Trainer",
@@ -111,7 +105,7 @@ const transformClass = (cls: any) => {
           cls.trainer.avatar ??
           getAvatarFallback(cls.trainer.userId?.name ?? "Trainer"),
         // Extra profile fields for the class-details modal's expandable
-        // trainer view — undefined if not set, not an error.
+        // trainer view. Undefined when not set, which is not an error.
         bio: cls.trainer.bio ?? null,
         specialty: cls.trainer.specialty ?? null,
         phone: cls.trainer.phone ?? null,
@@ -149,9 +143,7 @@ const transformClass = (cls: any) => {
   };
 };
 
-// ------------------------
-// CREATE CLASS
-// ------------------------
+/** Creates a class. */
 export const createClass = async (data: {
   name: string;
   schedule: Date;
@@ -166,7 +158,7 @@ export const createClass = async (data: {
     threeMonths?: number;
   };
   capacity?: number;
-  // A User._id — same convention as assignTrainerToClass's userId param.
+  // A User._id, the same convention as the userId of assignTrainerToClass.
   trainer: string;
   image?: string;
 }) => {
@@ -179,11 +171,10 @@ export const createClass = async (data: {
     throw new AppError("Class with same name and schedule already exists", 409);
   }
 
-  // Resolve the trainer's User._id -> TrainerProfile._id, exactly the
-  // same validation + lookup assignTrainerToClass already does. Doing
-  // this in the service (not just the Zod schema) means an invalid or
-  // non-trainer userId is rejected with a clear error, not silently
-  // saved as a broken reference.
+  // Resolve the trainer's User._id to a TrainerProfile._id with the same
+  // validation as assignTrainerToClass. Doing it in the service, not only in
+  // the Zod schema, means an invalid or non-trainer userId is rejected with a
+  // clear error instead of being saved as a broken reference.
   const trainerUser = await userRepository.findUserById(data.trainer);
   if (!trainerUser) throw new AppError("Trainer user not found", 404);
   if (trainerUser.role !== "trainer") {
@@ -201,7 +192,7 @@ export const createClass = async (data: {
     schedule: data.schedule,
     duration: data.duration,
     recurrence: data.recurrence,
-    recurrenceDays: data.recurrenceDays as DayOfWeek[], // ✅
+    recurrenceDays: data.recurrenceDays as DayOfWeek[],
     description: data.description,
     pricing: data.pricing,
     capacity: data.capacity,
@@ -211,35 +202,29 @@ export const createClass = async (data: {
   });
 };
 
-// ------------------------
-// GET ALL CLASSES
-// ------------------------
+/** Lists all classes. */
 export const getAllClasses = async () => {
   const classes = await classRepository.findAllClasses();
   return classes.map(transformClass);
 };
 
-// ------------------------
-// GET CLASSES BY MEMBER ID
-// Used by the admin member-details view to show "classes joined".
-// ------------------------
+/**
+ * Lists the classes a member is enrolled in. Used by the admin
+ * member-details view ("classes joined").
+ */
 export const getClassesByMemberId = async (memberProfileId: string) => {
   const classes = await classRepository.findClassesByMemberId(memberProfileId);
   return classes.map(transformClass);
 };
 
-// ------------------------
-// GET CLASS BY ID
-// ------------------------
+/** Finds a class by id. */
 export const getClassById = async (id: string) => {
   const foundClass = await classRepository.findClassById(id);
   if (!foundClass) throw new AppError("Class not found", 404);
   return transformClass(foundClass);
 };
 
-// ------------------------
-// UPDATE CLASS
-// ------------------------
+/** Updates a class. */
 export const updateClass = async (
   id: string,
   data: {
@@ -264,20 +249,16 @@ export const updateClass = async (
   const foundClass = await classRepository.findClassById(id);
   if (!foundClass) throw new AppError("Class not found", 404);
 
-  // A recurring class's series doesn't end just because its original
-  // anchor date has passed — it's still actively happening on its
-  // recurrenceDays. This check only makes sense for one-off classes,
-  // where the single scheduled date genuinely is the whole event.
+  // A recurring class's series does not end when its original anchor date
+  // passes; it keeps happening on its recurrenceDays. This check therefore
+  // applies to one-off classes only, where the single date is the whole event.
   if (foundClass.recurrence === "none" && foundClass.schedule < new Date()) {
     throw new AppError("Cannot update a class that already happened", 400);
   }
 
-  // ⚠️ data.trainer, like createClass's, is a User._id — resolve it to
-  // the matching TrainerProfile._id before saving. Previously this just
-  // did `new Types.ObjectId(data.trainer)` directly, which silently
-  // stored the wrong ID type if a User._id was passed in (as the Edit
-  // modal now does, to stay consistent with the Create modal and the
-  // rest of the admin trainer-selection UI).
+  // data.trainer is a User._id, as in createClass. Resolve it to the
+  // matching TrainerProfile._id before saving, so the stored reference is the
+  // right type.
   let resolvedTrainerId: Types.ObjectId | undefined;
   if (data.trainer) {
     const trainerUser = await userRepository.findUserById(data.trainer);
@@ -302,7 +283,7 @@ export const updateClass = async (
     ...(data.duration !== undefined && { duration: data.duration }),
     ...(data.recurrence && { recurrence: data.recurrence }),
     ...(data.recurrenceDays && {
-      recurrenceDays: data.recurrenceDays as DayOfWeek[], // ✅
+      recurrenceDays: data.recurrenceDays as DayOfWeek[],
     }),
     ...(data.pricing && { pricing: data.pricing }),
     ...(data.capacity !== undefined && { capacity: data.capacity }),
@@ -314,9 +295,7 @@ export const updateClass = async (
   });
 };
 
-// ------------------------
-// DELETE CLASS
-// ------------------------
+/** Deletes a class. */
 export const deleteClass = async (id: string) => {
   const foundClass = await classRepository.findClassById(id);
   if (!foundClass) throw new AppError("Class not found", 404);
@@ -335,16 +314,14 @@ export const deleteClass = async (id: string) => {
   return classRepository.deleteClass(id);
 };
 
-// ------------------------
-// ADD MEMBER TO CLASS
-// ------------------------
+/** Enrolls a member in a class (admin action). */
 export const addMemberToClass = async (classId: string, userId: string) => {
   const foundClass = await classRepository.findClassById(classId);
   if (!foundClass) throw new AppError("Class not found", 404);
 
-  // Same reasoning as updateClass — a recurring class keeps having new
-  // sessions, so its original anchor date being in the past doesn't
-  // mean there's nothing left to join.
+  // As in updateClass: a recurring class keeps having new sessions, so its
+  // original anchor date being in the past does not mean there is nothing
+  // left to join.
   if (foundClass.recurrence === "none" && foundClass.schedule < new Date()) {
     throw new AppError("Cannot join a past class", 400);
   }
@@ -374,9 +351,7 @@ export const addMemberToClass = async (classId: string, userId: string) => {
   return { message: "Member added to class successfully" };
 };
 
-// ------------------------
-// REMOVE MEMBER FROM CLASS
-// ------------------------
+/** Removes a member from a class (admin action). */
 export const removeMemberFromClass = async (
   classId: string,
   userId: string,
@@ -405,16 +380,13 @@ export const removeMemberFromClass = async (
   return { message: "Member removed from class successfully" };
 };
 
-// ------------------------
-// ASSIGN / CHANGE TRAINER
-// ------------------------
+/** Assigns or changes the trainer of a class (admin action). */
 export const assignTrainerToClass = async (classId: string, userId: string) => {
   const foundClass = await classRepository.findClassById(classId);
   if (!foundClass) throw new AppError("Class not found", 404);
 
-  // Same reasoning again — assigning/changing a trainer for an
-  // actively-recurring class should work regardless of its original
-  // anchor date.
+  // As above: assigning or changing the trainer of a recurring class must
+  // work regardless of its original anchor date.
   if (foundClass.recurrence === "none" && foundClass.schedule < new Date()) {
     throw new AppError("Cannot assign trainer to past class", 400);
   }
@@ -434,9 +406,7 @@ export const assignTrainerToClass = async (classId: string, userId: string) => {
   return classRepository.assignTrainerToClass(classId, trainer._id.toString());
 };
 
-// ------------------------
-// GET CLASS MEMBERS (for trainers)
-// ------------------------
+/** Lists the members of a class, for trainers and admins. */
 export const getClassMembers = async (
   classId: string,
   requestingUserId: string,

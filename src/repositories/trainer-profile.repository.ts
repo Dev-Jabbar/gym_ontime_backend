@@ -1,9 +1,7 @@
 import TrainerModel, { ITrainerProfile } from "../models/trainer-profile.model";
 import mongoose from "mongoose";
 
-/**
- * CREATE (✅ supports transactions)
- */
+/** Creates a trainer profile (supports transactions). */
 export const createTrainerProfile = async (
   data: Partial<ITrainerProfile>,
   session?: mongoose.ClientSession,
@@ -14,23 +12,17 @@ export const createTrainerProfile = async (
   return result[0];
 };
 
-/**
- * FIND ALL ACTIVE PROFILES
- */
+/** Lists all active trainer profiles. */
 export const findAllTrainerProfiles = async () => {
   return TrainerModel.find({ isActive: true });
 };
 
-/**
- * FIND PROFILE BY ID (ONLY ACTIVE)
- */
+/** Finds an active trainer profile by id. */
 export const findTrainerProfileById = async (id: string) => {
   return TrainerModel.findOne({ _id: id, isActive: true });
 };
 
-/**
- * FIND PROFILE BY USER ID (ONLY ACTIVE, supports session)
- */
+/** Finds the active trainer profile of a user (supports transactions). */
 export const findTrainerProfileByUserId = async (
   userId: string,
   session?: mongoose.ClientSession,
@@ -40,9 +32,7 @@ export const findTrainerProfileByUserId = async (
   return query;
 };
 
-/**
- * UPDATE PROFILE BY PROFILE ID
- */
+/** Updates a trainer profile by id. */
 export const updateTrainerProfile = async (
   id: string,
   data: Partial<ITrainerProfile>,
@@ -51,9 +41,7 @@ export const updateTrainerProfile = async (
   return TrainerModel.findByIdAndUpdate(id, data, { new: true, session });
 };
 
-/**
- * 🔥 UPDATE PROFILE BY USER ID (SOFT DELETE / REACTIVATE)
- */
+/** Updates a trainer profile by user id (used for soft delete and reactivation). */
 export const updateTrainerProfileByUserId = async (
   userId: string,
   data: Partial<ITrainerProfile>,
@@ -66,16 +54,12 @@ export const updateTrainerProfileByUserId = async (
   );
 };
 
-/**
- * ❌ HARD DELETE BY PROFILE ID (INTERNAL ONLY)
- */
+/** Permanently deletes a trainer profile. Internal use only. */
 export const deleteTrainerProfile = async (id: string) => {
   return TrainerModel.findByIdAndDelete(id);
 };
 
-/**
- * ✅ SOFT DELETE BY USER ID (sets isActive: false)
- */
+/** Soft-deletes the trainer profile of a user (sets isActive to false). */
 export const deleteTrainerProfileByUserId = (
   userId: string,
   session?: mongoose.ClientSession,

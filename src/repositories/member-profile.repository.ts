@@ -3,9 +3,7 @@ import MemberProfileModel, {
 } from "../models/member-profile.model";
 import mongoose from "mongoose";
 
-/**
- * CREATE MEMBER PROFILE
- */
+/** Creates a member profile. */
 export const createMemberProfile = async (
   data: Partial<IMemberProfile>,
   session?: mongoose.ClientSession,
@@ -18,23 +16,17 @@ export const createMemberProfile = async (
   return result[0];
 };
 
-/**
- * FIND ALL ACTIVE MEMBER PROFILES
- */
+/** Lists all active member profiles. */
 export const findAllMemberProfiles = async () => {
   return MemberProfileModel.find({ isActive: true });
 };
 
-/**
- * FIND MEMBER PROFILE BY ID
- */
+/** Finds a member profile by id. */
 export const findMemberProfileById = async (id: string) => {
   return MemberProfileModel.findOne({ _id: id, isActive: true });
 };
 
-/**
- * FIND MEMBER PROFILE BY USER ID
- */
+/** Finds the active member profile of a user. */
 export const findMemberProfileByUserId = async (
   userId: string,
   session?: mongoose.ClientSession,
@@ -44,9 +36,7 @@ export const findMemberProfileByUserId = async (
   return query;
 };
 
-/**
- * UPDATE MEMBER PROFILE BY ID
- */
+/** Updates a member profile by id. */
 export const updateMemberProfile = async (
   id: string,
   data: Partial<IMemberProfile>,
@@ -58,9 +48,7 @@ export const updateMemberProfile = async (
   });
 };
 
-/**
- * SOFT DELETE / UPDATE BY USER ID
- */
+/** Updates a member profile by user id (used for soft delete and reactivation). */
 export const updateMemberProfileByUserId = async (
   userId: string,
   data: Partial<IMemberProfile>,
@@ -74,13 +62,11 @@ export const updateMemberProfileByUserId = async (
 };
 
 /**
- * ✅ SOFT DELETE BY USER ID (sets isActive: false)
+ * Soft-deletes the member profile of a user. Despite the name it flips
+ * `isActive` to `false` instead of removing the document, so a returning
+ * member's history is preserved (`createMemberProfile` in the service layer
+ * reactivates the profile instead of duplicating it).
  */
-// Despite the name, this is a soft delete — it flips `isActive` to
-// `false` rather than removing the document, so a returning member's
-// history and profile data are preserved (see `createMemberProfile`
-// in the service layer, which reactivates this instead of duplicating
-// it).
 export const deleteMemberProfileByUserId = (
   userId: string,
   session?: mongoose.ClientSession,
@@ -92,9 +78,7 @@ export const deleteMemberProfileByUserId = (
   );
 };
 
-/**
- * FIND MEMBER PROFILE BY USER ID (INCLUDING INACTIVE)
- */
+/** Finds the member profile of a user, including inactive ones. */
 export const findMemberProfileByUserIdIncludingInactive = async (
   userId: string,
   session?: mongoose.ClientSession,

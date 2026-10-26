@@ -66,9 +66,7 @@ const transformClass = (cls: any) => {
   };
 };
 
-/**
- * GET MY CLASSES (TRAINER)
- */
+/** Lists the classes taught by a trainer. */
 export const getMyClasses = async (userId: string) => {
   const profile =
     await trainerProfileRepository.findTrainerProfileByUserId(userId);
@@ -77,12 +75,10 @@ export const getMyClasses = async (userId: string) => {
   const classes = await classRepository.findClassesByTrainerId(
     profile._id.toString(),
   );
-  return classes.map(transformClass); // ✅ transform applied
+  return classes.map(transformClass);
 };
 
-/**
- * CREATE TRAINER PROFILE
- */
+/** Creates a trainer profile, or reactivates an existing soft-deleted one. */
 export const createTrainerProfile = async (
   user: IUser,
   data?: TrainerProfileData,
@@ -126,9 +122,7 @@ export const createTrainerProfile = async (
   });
 };
 
-/**
- * GET MY TRAINER PROFILE
- */
+/** Returns a trainer's own profile. */
 export const getMyTrainerProfile = async (userId: string) => {
   const profile =
     await trainerProfileRepository.findTrainerProfileByUserId(userId);
@@ -142,9 +136,7 @@ export const getTrainerAvatar = async (userId: string) => {
   return profile?.avatar ?? null;
 };
 
-/**
- * UPDATE MY TRAINER PROFILE
- */
+/** Updates a trainer's own profile. */
 export const updateMyTrainerProfile = async (
   userId: string,
   data: TrainerProfileData & { name?: string },
@@ -172,9 +164,7 @@ export const updateMyTrainerProfile = async (
   return trainerProfileRepository.findTrainerProfileByUserId(userId);
 };
 
-/**
- * DELETE MY TRAINER PROFILE
- */
+/** Soft-deletes a trainer's own profile and unassigns them from their classes. */
 export const deleteMyTrainerProfile = async (userId: string) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -202,25 +192,19 @@ export const deleteMyTrainerProfile = async (userId: string) => {
   }
 };
 
-/**
- * GET ALL TRAINER PROFILES
- */
+/** Lists all trainer profiles. */
 export const getAllTrainerProfiles = async () => {
   return trainerProfileRepository.findAllTrainerProfiles();
 };
 
-/**
- * GET TRAINER PROFILE BY ID
- */
+/** Returns one trainer profile. */
 export const getTrainerProfileById = async (id: string) => {
   const profile = await trainerProfileRepository.findTrainerProfileById(id);
   if (!profile) throw new AppError("Trainer profile not found", 404);
   return profile;
 };
 
-/**
- * UPGRADE MEMBER TO TRAINER
- */
+/** Upgrades a member to trainer. */
 export const upgradeMemberToTrainer = async (userId: string) => {
   const session = await mongoose.startSession();
   session.startTransaction();

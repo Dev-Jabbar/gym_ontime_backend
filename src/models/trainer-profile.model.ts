@@ -8,7 +8,7 @@ export interface ITrainerProfile {
   bio?: string;
   specialty?: string;
   phone?: string;
-  experience?: number; // years
+  experience?: number; // In years.
   certifications?: string[];
   availability?: string;
   dateOfBirth?: Date;

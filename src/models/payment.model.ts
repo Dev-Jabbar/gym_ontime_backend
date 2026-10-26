@@ -12,10 +12,10 @@ export interface IPayment {
 
   status: "pending" | "completed" | "failed";
 
-  // ✅ NEW: set when verifyPayment claims the seat and finds the hold
-  // expired or the class full — money was charged but the seat isn't
-  // secured, so the payment is held back from "completed" pending a
-  // human decision (refund vs. manual enroll).
+  // Set when verifyPayment finds the hold expired or the class full after a
+  // charge: the money was taken but the seat is not secured, so the payment
+  // is held back from "completed" until a person decides (refund or manual
+  // enrollment).
   needsReview: boolean;
 
   paymentType: "one-time" | "subscription";
@@ -30,7 +30,7 @@ export interface IPayment {
 
   subscription?: Types.ObjectId;
 
-  // Added by { timestamps: true } in the schema
+  // Added by { timestamps: true } in the schema.
   createdAt: Date;
   updatedAt: Date;
 }
@@ -75,17 +75,16 @@ const paymentSchema = new Schema<IPayment>(
       default: "pending",
     },
 
-    // ✅ NEW: flags a charged payment whose seat hold expired or lost
-    // its spot before verifyPayment could confirm it. Kept separate
-    // from `status` so these don't get silently swept up by anything
-    // filtering on status: "pending" or "failed" — they need a human
-    // to look at them specifically.
+    // Flags a charged payment whose seat hold expired or whose spot was lost
+    // before verifyPayment could confirm it. Kept separate from `status` so
+    // these payments are not swept up by anything filtering on "pending" or
+    // "failed": they need a person to look at them specifically.
     needsReview: {
       type: Boolean,
       default: false,
     },
 
-    // ✅ NEW: Payment type
+    // Payment type.
     paymentType: {
       type: String,
       enum: ["one-time", "subscription"],
@@ -93,13 +92,13 @@ const paymentSchema = new Schema<IPayment>(
       required: true,
     },
 
-    // ✅ NEW: Subscription interval
+    // Subscription interval.
     subscriptionInterval: {
       type: String,
       enum: ["weekly", "monthly", "threeMonths"],
     },
 
-    // Stripe
+    // Stripe (legacy provider fields).
     stripeSessionId: String,
     stripePaymentIntentId: String,
 
@@ -107,7 +106,7 @@ const paymentSchema = new Schema<IPayment>(
     paystackReference: String,
     paystackAccessCode: String,
 
-    // ✅ NEW: Link to subscription
+    // Link to the subscription.
     subscription: {
       type: Schema.Types.ObjectId,
       ref: "ClassSubscription",
@@ -116,11 +115,12 @@ const paymentSchema = new Schema<IPayment>(
   { timestamps: true },
 );
 
-// ✅ NEW — covers findPaymentByReference/updatePaymentByReference, hit
-// on every Paystack webhook. unique + sparse: a given reference maps
-// to exactly one payment, and sparse skips documents where the field
-// doesn't exist (e.g. Stripe-only payments).
-// ⚠️ Before deploying, verify no existing duplicate non-null values:
+// Serves findPaymentByReference and updatePaymentByReference, which run on
+// every Paystack webhook. unique + sparse: a reference maps to exactly one
+// payment, and sparse skips documents without the field (for example
+// Stripe-only payments).
+// Before creating this index on existing data, check for duplicate non-null
+// values:
 //   db.payments.aggregate([
 //     { $match: { paystackReference: { $ne: null } } },
 //     { $group: { _id: "$paystackReference", count: { $sum: 1 } } },
@@ -128,25 +128,25 @@ const paymentSchema = new Schema<IPayment>(
 //   ])
 paymentSchema.index({ paystackReference: 1 }, { unique: true, sparse: true });
 
-// ✅ NEW — covers findPaymentByStripeSessionId, hit on every Stripe
-// webhook. Same duplicate check applies for stripeSessionId.
+// Serves findPaymentByStripeSessionId. The same duplicate check applies to
+// stripeSessionId.
 paymentSchema.index({ stripeSessionId: 1 }, { unique: true, sparse: true });
 
-// ✅ NEW — covers findPaymentsByUserId({ user }).sort({ createdAt: -1 })
+// Serves findPaymentsByUserId({ user }).sort({ createdAt: -1 }).
 paymentSchema.index({ user: 1, createdAt: -1 });
 
-// ✅ NEW — covers findCompletedPayment({ user, class, status })
+// Serves findCompletedPayment({ user, class, status }).
 paymentSchema.index({ user: 1, class: 1, status: 1 });
 
-// ✅ NEW — covers findPaymentsByClassId({ class, status: "completed" })
+// Serves findPaymentsByClassId({ class, status: "completed" }).
 paymentSchema.index({ class: 1, status: 1 });
 
-// ✅ NEW — covers findStalePendingPayments({ status: "pending", createdAt }),
-// used by the scheduled cleanup job
+// Serves findStalePendingPayments({ status: "pending", createdAt }), used by
+// the scheduled cleanup job.
 paymentSchema.index({ status: 1, createdAt: 1 });
 
-// ✅ NEW — lets an admin dashboard pull every payment awaiting manual
-// review without a full collection scan.
+// Lets an admin dashboard list every payment awaiting manual review without
+// a full collection scan.
 paymentSchema.index({ needsReview: 1, createdAt: -1 });
 
 export default model<IPayment>("Payment", paymentSchema);

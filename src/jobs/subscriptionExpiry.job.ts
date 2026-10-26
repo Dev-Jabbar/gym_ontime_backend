@@ -11,18 +11,18 @@ export const runSubscriptionExpiry = async () => {
 
   for (const subscription of expiredSubscriptions) {
     try {
-      // Flip status first — even if the class-removal step below fails
-      // for some reason, the subscription itself is correctly marked
-      // expired and won't be picked up as "active" anywhere else
-      // (e.g. the Booked indicator, which checks status + endDate).
+      // Flip the status first: even if the class-removal step below fails, the
+      // subscription is correctly marked expired and is not treated as
+      // "active" anywhere else (for example the Booked indicator, which
+      // checks status and endDate).
       await classSubscriptionRepository.updateSubscriptionStatus(
         subscription._id.toString(),
         "expired",
       );
 
-      // Pull the member out of the class's members array — otherwise
-      // they'd stay enrolled (and counted toward capacity) forever
-      // after their subscription lapsed.
+      // Remove the member from the class's members array; otherwise they
+      // would stay enrolled, and count toward capacity, after their
+      // subscription lapsed.
       await classRepository.removeMemberFromClass(
         subscription.class.toString(),
         subscription.memberProfile.toString(),
@@ -32,7 +32,7 @@ export const runSubscriptionExpiry = async () => {
         `⏰ Expired subscription ${subscription._id} — removed member from class ${subscription.class}`,
       );
     } catch (err) {
-      // One bad subscription shouldn't halt the rest of the sweep.
+      // One failing subscription must not stop the rest of the sweep.
       console.log(
         `⚠️ Could not fully process expired subscription ${subscription._id}:`,
         err,
@@ -46,10 +46,9 @@ export const runSubscriptionExpiry = async () => {
 };
 
 /**
- * Runs every hour. Subscriptions don't need the same 15-minute
- * urgency as the payment cleanup job — a subscription lapsing an
- * hour "late" isn't a meaningful problem, so this runs less
- * frequently to reduce unnecessary load.
+ * Runs every hour. Subscription expiry is less urgent than the payment
+ * cleanup: a subscription lapsing an hour late is not a meaningful problem,
+ * so this runs less often to reduce load.
  */
 export const startSubscriptionExpiryJob = () => {
   cron.schedule("0 * * * *", runSubscriptionExpiry);

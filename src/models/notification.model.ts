@@ -65,11 +65,11 @@ const notificationSchema = new Schema<INotification>(
   { timestamps: true },
 );
 
-// Covers findByUserId({ user }).sort({ createdAt: -1 }), avoids an
-// in-memory sort since createdAt is part of the index.
+// Serves findByUserId({ user }).sort({ createdAt: -1 }). Because createdAt is
+// part of the index, no in-memory sort is needed.
 notificationSchema.index({ user: 1, createdAt: -1 });
 
-// Covers countUnread({ user, read: false }) and
+// Serves countUnread({ user, read: false }) and
 // markAllAsRead({ user, read: false }) as one compound lookup.
 notificationSchema.index({ user: 1, read: 1 });
 

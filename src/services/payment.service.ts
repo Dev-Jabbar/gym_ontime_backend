@@ -148,9 +148,8 @@ export const createCheckoutSession = async ({
   }
 
   // Atomically claim a seat and hold it under this member's profile for
-  // SEAT_HOLD_MINUTES. Counts confirmed members AND other people's
-  // active holds, so two people can't both be sent to pay for the last
-  // spot.
+  // SEAT_HOLD_MINUTES. Confirmed members and other people's active holds
+  // both count, so two people cannot both be sent to pay for the last spot.
   const reserved = await ClassRepo.reserveSeat(
     classId,
     memberProfile._id.toString(),
@@ -187,8 +186,8 @@ export const createCheckoutSession = async ({
     );
     data = response.data;
   } catch (err) {
-    // Paystack init failed — don't leave this seat locked for 15
-    // minutes over a checkout that never actually started.
+    // Paystack initialization failed: do not leave the seat locked for 15
+    // minutes over a checkout that never started.
     await ClassRepo.releaseSeat(classId, memberProfile._id.toString());
     throw err;
   }
@@ -208,9 +207,8 @@ export const createCheckoutSession = async ({
       subscriptionInterval,
     });
   } catch (err) {
-    // Paystack already has a live session, but we failed to save our own
-    // record of it — release the hold rather than lock the seat for 15
-    // minutes with no record verifyPayment could ever find.
+    // Paystack has a live session but our payment record was not saved:
+    // release the hold, because verifyPayment could never find this payment.
     await ClassRepo.releaseSeat(classId, memberProfile._id.toString());
     throw new Error(
       `Failed to save payment record. Please contact support with reference: ${data.data.reference}`,
@@ -224,20 +222,19 @@ export const createCheckoutSession = async ({
 };
 
 /**
- * Attempts to convert a member's seat hold into a confirmed seat, and
- * reports back exactly why if it can't.
+ * Tries to convert a member's seat hold into a confirmed seat and reports
+ * exactly why it could not.
  *
- * Called internally by `verifyPayment()` only — there is deliberately
- * no other path in the codebase that calls this, so both the webhook
- * and manual-verification flows end up here through the exact same
- * function rather than two implementations that could drift apart.
+ * Only `verifyPayment()` calls this, so the webhook, the manual check and
+ * the cleanup sweep all reach it through one function instead of separate
+ * implementations that could drift apart.
  *
  * @returns One of:
- *  - `"enrolled"` — the hold was valid and is now a confirmed seat
- *  - `"already-enrolled"` — this member was already a confirmed member
- *  - `"hold-expired"` — their hold lapsed before payment came through
- *  - `"class-full"` — no hold existed and the class has no room
- *  - `"error"` — an unexpected state (e.g. class no longer exists)
+ *  - `"enrolled"`: the hold was valid and is now a confirmed seat
+ *  - `"already-enrolled"`: the member was already confirmed
+ *  - `"hold-expired"`: the hold lapsed before the payment came through
+ *  - `"class-full"`: no hold existed and the class has no room
+ *  - `"error"`: an unexpected state (for example the class no longer exists)
  */
 export const claimSeat = async (classId: string, memberProfileId: string) => {
   const updatedClass = await ClassRepo.confirmSeat(classId, memberProfileId);
@@ -258,29 +255,24 @@ export const claimSeat = async (classId: string, memberProfileId: string) => {
 };
 
 /**
- * The single source of truth for "did this payment actually happen,
- * and if so, does the member get their seat." Both the Paystack
- * webhook and the frontend's own manual "did it work" check call this
- * exact function — there is no separate implementation for either
- * path.
+ * The single source of truth for "did this payment happen, and does the
+ * member get their seat". The Paystack webhook, the frontend's manual check
+ * and the cleanup sweep all call it.
  *
- * Re-verifies the charge directly against Paystack's API (never trusts
- * a status the caller merely claims), then on success calls
- * `claimSeat()` to convert the hold into a real seat. If the seat can
- * no longer be granted (hold expired, class filled up in the
- * meantime), the payment is flagged `needsReview` rather than silently
- * treated as a failure or a success — that's a business decision
- * (refund vs. offer another slot), not something safe to guess in code.
+ * It re-verifies the charge directly with Paystack's API (never trusting a
+ * status the caller claims) and, on success, calls `claimSeat()` to turn the
+ * hold into a real seat. If the seat can no longer be granted (hold expired,
+ * or the class filled up), the payment is flagged `needsReview` instead of
+ * being treated as a failure or a success: refund versus another slot is a
+ * business decision, not something to guess in code.
  *
- * Idempotent: calling this twice for an already-`completed` payment is
- * a no-op that returns early, so it's safe for the webhook and a
- * manual check to both fire for the same payment.
+ * Idempotent: calling it again for an already `completed` payment returns
+ * early, so the webhook and a manual check can both fire safely.
  *
  * @param reference - The Paystack transaction reference to verify.
- * @throws If Paystack reports the charge failed, or the request to
- *   Paystack itself errors. In the failure case, this also persists
- *   `status: "failed"` and releases the seat hold before throwing —
- *   see the comment inline below for why that matters.
+ * @throws If Paystack reports the charge failed or the request to Paystack
+ *   errors. When the charge failed it first persists `status: "failed"` and
+ *   releases the seat hold (see the inline comment below).
  */
 export const verifyPayment = async (reference: string) => {
   const { data } = await axios.get<PaystackVerifyResponse>(
@@ -292,11 +284,10 @@ export const verifyPayment = async (reference: string) => {
     },
   );
 
-  // Paystack does not send a webhook event for a failed/declined charge —
-  // per their own docs, webhooks only fire for a successful charge. This
-  // verify() call is the ONLY place in the flow that ever finds out about
-  // a failure, so it persists "failed" (instead of leaving the record
-  // stuck at "pending" forever) and releases the seat hold right away.
+  // Paystack only sends webhooks for successful charges, so this call is the
+  // only place a failed or declined charge is discovered. Persist "failed"
+  // (rather than leave the record "pending" forever) and release the seat
+  // hold right away.
   if (data.data.status !== "success") {
     const payment = await PaymentRepo.findPaymentByReference(reference);
     if (payment && payment.status === "pending") {
@@ -332,17 +323,17 @@ export const verifyPayment = async (reference: string) => {
     throw new Error("Payment has no associated class");
   }
 
-  // Claim the seat before marking anything complete, so a "completed"
-  // payment can never exist without a genuinely secured seat behind it.
+  // Claim the seat before marking the payment complete, so a "completed"
+  // payment can never exist without a secured seat behind it.
   const seatResult = await claimSeat(
     payment.class.toString(),
     memberProfile._id.toString(),
   );
 
   if (seatResult === "hold-expired" || seatResult === "class-full") {
-    // Money was charged but the seat is no longer available. Flag for
-    // manual review instead of guessing whether to refund or bump
-    // someone — that's a business decision, not a code decision.
+    // The charge succeeded but the seat is gone. Flag it for manual review
+    // instead of guessing whether to refund or bump someone: that is a
+    // business decision, not a code decision.
     await PaymentRepo.updatePaymentByReference(reference, {
       needsReview: true,
     });
@@ -364,7 +355,7 @@ export const verifyPayment = async (reference: string) => {
     throw new Error(`Unexpected error claiming seat for payment ${reference}`);
   }
 
-  // "enrolled" or "already-enrolled" — safe to continue.
+  // Seat result is "enrolled" or "already-enrolled": safe to continue.
   if (payment.paymentType === "subscription" && payment.subscriptionInterval) {
     const startDate = new Date();
     const endDate = calculateEndDate(startDate, payment.subscriptionInterval);
@@ -390,9 +381,8 @@ export const verifyPayment = async (reference: string) => {
     });
   }
 
-  // Fetch the class name for a friendlier message — falls back to a
-  // generic one if the lookup fails, since a notification isn't worth
-  // failing the whole verification over.
+  // The class name makes the message friendlier, but a notification is not
+  // worth failing the whole verification, so fall back to generic wording.
   let className: string | null = null;
   try {
     const classDoc = await ClassRepo.findClassById(payment.class.toString());

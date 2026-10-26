@@ -9,9 +9,7 @@ import {
   trainerIdParamSchema,
 } from "../validations/trainer-profile.validation";
 
-/**
- * CREATE MY TRAINER PROFILE
- */
+/** Creates the logged-in trainer's profile. */
 export const createTrainerProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -52,9 +50,7 @@ export const createTrainerProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * GET MY TRAINER PROFILE
- */
+/** Returns the logged-in trainer's profile. */
 export const getMyTrainerProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -73,9 +69,7 @@ export const getMyTrainerProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * UPDATE MY TRAINER PROFILE
- */
+/** Updates the logged-in trainer's profile. */
 export const updateMyTrainerProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -113,9 +107,7 @@ export const updateMyTrainerProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * DELETE MY TRAINER PROFILE
- */
+/** Soft-deletes the logged-in trainer's profile. */
 export const deleteMyTrainerProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -133,9 +125,7 @@ export const deleteMyTrainerProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * PUBLIC: GET ALL TRAINER PROFILES
- */
+/** Lists all trainer profiles (public in this version). */
 export const getAllTrainerProfiles = async (_: Request, res: Response) => {
   try {
     const trainerProfiles = await trainerProfileService.getAllTrainerProfiles();
@@ -146,9 +136,7 @@ export const getAllTrainerProfiles = async (_: Request, res: Response) => {
   }
 };
 
-/**
- * PUBLIC: GET TRAINER PROFILE BY ID
- */
+/** Returns one trainer profile (public in this version). */
 export const getTrainerProfileById = async (req: Request, res: Response) => {
   try {
     const { id } = trainerIdParamSchema.parse(req.params);
@@ -167,9 +155,7 @@ export const getTrainerProfileById = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * UPGRADE TO TRAINER (kept for backward compatibility)
- */
+/** Upgrades a member to trainer. Kept for backward compatibility. */
 export const upgradeToTrainer = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -192,9 +178,7 @@ export const upgradeToTrainer = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * GET MY CLASSES (TRAINER)
- */
+/** Lists the classes taught by the logged-in trainer. */
 export const getMyClasses = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;

@@ -5,10 +5,10 @@ export const findAdminProfileByUserId = async (userId: string) => {
 };
 
 /**
- * Upsert rather than a plain update — admin accounts are created via
- * the seed script (see package.json's seed:admin), not the public
- * register flow, so there's no guarantee an AdminProfile document
- * exists yet the first time an admin saves their avatar.
+ * Upsert rather than a plain update: admin accounts are created by the seed
+ * script (see `seed:admin` in package.json), not the public register flow,
+ * so an AdminProfile document may not exist yet the first time an admin
+ * saves their avatar.
  */
 export const upsertAdminProfileByUserId = async (
   userId: string,

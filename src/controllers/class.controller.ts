@@ -10,9 +10,7 @@ import {
 } from "../validations/class.validation";
 import { AppError } from "../errors/AppError";
 
-/**
- * ✅ Create class
- */
+/** Creates a class (admin). */
 export const createClass = async (req: Request, res: Response) => {
   try {
     console.log("Request body for creating class:", req.body);
@@ -40,9 +38,7 @@ export const createClass = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Get all classes
- */
+/** Lists all classes (public). */
 export const getAllClasses = async (req: Request, res: Response) => {
   try {
     const classes = await classService.getAllClasses();
@@ -54,8 +50,8 @@ export const getAllClasses = async (req: Request, res: Response) => {
 };
 
 /**
- * ✅ Get classes by member ID (Admin only)
- * Used by the admin member-details view to show "classes joined".
+ * Lists the classes a member is enrolled in (admin). Used by the admin
+ * member-details view ("classes joined").
  */
 export const getClassesByMemberController = async (
   req: Request,
@@ -71,9 +67,7 @@ export const getClassesByMemberController = async (
   }
 };
 
-/**
- * ✅ Get class by ID
- */
+/** Returns one class (public). */
 export const getClassById = async (req: Request, res: Response) => {
   try {
     const { id } = classIdParamSchema.parse(req.params);
@@ -97,9 +91,7 @@ export const getClassById = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Get class member count (PUBLIC)
- */
+/** Returns how full a class is (public). */
 export const getClassMemberCount = async (req: Request, res: Response) => {
   try {
     const { id } = classIdParamSchema.parse(req.params);
@@ -137,9 +129,7 @@ export const getClassMemberCount = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Update class
- */
+/** Updates a class (admin). */
 export const updateClass = async (req: Request, res: Response) => {
   try {
     const { id } = classIdParamSchema.parse(req.params);
@@ -170,9 +160,7 @@ export const updateClass = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Delete class
- */
+/** Deletes a class (admin). */
 export const deleteClass = async (req: Request, res: Response) => {
   try {
     const { id } = classIdParamSchema.parse(req.params);
@@ -200,9 +188,7 @@ export const deleteClass = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ ADD MEMBER TO CLASS
- */
+/** Enrolls a member in a class (admin). */
 export const addMemberToClass = async (req: Request, res: Response) => {
   try {
     const { id: classId, userId } = memberClassParamsSchema.parse(req.params);
@@ -224,9 +210,7 @@ export const addMemberToClass = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ REMOVE MEMBER FROM CLASS
- */
+/** Removes a member from a class (admin). */
 export const removeMemberFromClass = async (req: Request, res: Response) => {
   try {
     const { id: classId, userId } = memberClassParamsSchema.parse(req.params);
@@ -248,9 +232,7 @@ export const removeMemberFromClass = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ ASSIGN TRAINER TO CLASS
- */
+/** Assigns a trainer to a class (admin). */
 export const assignTrainerToClass = async (req: Request, res: Response) => {
   try {
     const { id: classId, userId } = assignTrainerParamsSchema.parse(req.params);
@@ -275,9 +257,7 @@ export const assignTrainerToClass = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * ✅ Get class members (for trainers)
- */
+/** Lists the members of a class (trainer for own classes, or admin). */
 export const getClassMembers = async (req: Request, res: Response) => {
   try {
     const { id } = classIdParamSchema.parse(req.params);

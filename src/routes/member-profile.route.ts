@@ -4,14 +4,10 @@ import { protect } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
-/**
- * PUBLIC
- */
+// Public.
 router.get("/", memberProfileController.getAllMemberProfiles);
 
-/**
- * MEMBER (own profile)
- */
+// Member: own profile.
 router.post(
   "/profile",
   protect(["member"]),
@@ -36,9 +32,7 @@ router.delete(
   memberProfileController.deleteMyMemberProfile,
 );
 
-/**
- * PUBLIC
- */
+// Public.
 router.get("/:id", memberProfileController.getMemberProfileById);
 
 export default router;

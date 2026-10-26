@@ -5,16 +5,14 @@ import * as NotificationService from "../services/notification.service";
 const REMINDER_WINDOW_MINUTES = 60;
 
 /**
- * Returns when this class's NEXT session starts, given its recurrence
- * pattern. Same reasoning as the status/expiry logic elsewhere in this
- * codebase: a recurring class's original anchor `schedule` date is
- * just the first-ever occurrence, not "the" date — what matters here
- * is today's occurrence (if the class runs today at all).
+ * Returns when this class's session today starts, given its recurrence
+ * pattern. A recurring class's original `schedule` date is only its
+ * first-ever occurrence; what matters here is today's occurrence, if the
+ * class runs today at all.
  *
- * Returns null if there's no session today (e.g. a weekly class on a
- * day that isn't one of its recurrenceDays) — the job simply won't
- * fire for it today, which is correct; it'll fire on the right day
- * instead.
+ * Returns null when there is no session today (for example a weekly class
+ * on a day that is not one of its recurrenceDays). The job then does nothing
+ * for that class today.
  */
 function getTodaysSessionStart(
   scheduleAnchor: Date,
@@ -23,8 +21,8 @@ function getTodaysSessionStart(
   now: Date,
 ): Date | null {
   if (recurrence === "none") {
-    // One-off class — there's only ever one occurrence: the anchor
-    // itself. Already-passed one-offs return null (nothing to remind).
+    // One-off class: there is only one occurrence, the anchor itself.
+    // One-offs that have already passed return null (nothing to remind).
     return scheduleAnchor > now ? scheduleAnchor : null;
   }
 
@@ -41,7 +39,7 @@ function getTodaysSessionStart(
 
   const isValidDayToday =
     recurrence === "daily" ||
-    recurrence === "monthly" || // not reachable via current UI, safe fallback
+    recurrence === "monthly" || // Not offered in the UI; treated as every day.
     (recurrence === "weekly" && recurrenceDays.includes(todayName));
 
   if (!isValidDayToday) return null;
@@ -58,10 +56,10 @@ function getTodaysSessionStart(
 }
 
 /**
- * True if `date` falls on the same calendar day as `now`, in the
- * app's timezone — used to make sure a class only gets reminded once
- * per day, even though this job runs every 15 minutes and a session's
- * "starting within the hour" window spans several ticks.
+ * True if `date` falls on the same calendar day as `now` in the app's time
+ * zone. Used to remind a class at most once per day, even though the job
+ * runs every 15 minutes and the "starting within the hour" window spans
+ * several runs.
  */
 function isSameCalendarDay(date: Date, now: Date): boolean {
   const dateStr = date.toLocaleDateString("en-NG", {
@@ -93,7 +91,7 @@ export const runClassReminders = async () => {
       const minutesUntilStart =
         (sessionStart.getTime() - now.getTime()) / 60000;
 
-      // Not starting soon enough yet, or already started/passed.
+      // Not starting soon enough yet, or already started or passed.
       if (
         minutesUntilStart < 0 ||
         minutesUntilStart > REMINDER_WINDOW_MINUTES
@@ -101,7 +99,7 @@ export const runClassReminders = async () => {
         continue;
       }
 
-      // Already reminded for today's occurrence — skip.
+      // Already reminded for today's session: skip.
       const lastSent = (cls as any).lastReminderSentAt;
       if (lastSent && isSameCalendarDay(new Date(lastSent), now)) {
         continue;
@@ -126,7 +124,7 @@ export const runClassReminders = async () => {
       await classRepository.markReminderSent((cls as any)._id.toString(), now);
       remindersSent++;
     } catch (err) {
-      // One bad class shouldn't halt reminders for every other class.
+      // One failing class must not stop reminders for the others.
       console.log(
         `⚠️ Could not process reminder for class ${(cls as any)._id}:`,
         err,
@@ -140,9 +138,8 @@ export const runClassReminders = async () => {
 };
 
 /**
- * Runs every 15 minutes — frequent enough to reliably catch the
- * 60-minute "starting soon" window without much lag, since the window
- * itself is much larger than the check interval.
+ * Runs every 15 minutes. The "starting soon" window (60 minutes) is much
+ * larger than the check interval, so no class is missed.
  */
 export const startClassReminderJob = () => {
   cron.schedule("*/15 * * * *", runClassReminders);

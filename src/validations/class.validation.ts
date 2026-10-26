@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-/**
- * 🔹 Reusable Mongo ObjectId validation
- */
+/** Reusable MongoDB ObjectId validation. */
 export const objectIdSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ObjectId");
@@ -33,16 +31,13 @@ export const createClassSchema = z.object({
     threeMonths: z.number().min(0).optional(),
   }),
   capacity: z.number().min(1, "Capacity must be at least 1").optional(),
-  // ✅ Optional Cloudinary URL for the class card's banner image.
-  // Optional on purpose — a class with no image renders fine, just
-  // without the banner.
+  // Optional Cloudinary URL for the class card's banner image.
   image: z.string().url().optional(),
-  // ⚠️ This is a User._id, not a TrainerProfile._id — same convention
-  // as assignTrainerParamsSchema's userId. The service layer resolves
-  // it to the matching TrainerProfile before saving, mirroring exactly
-  // what assignTrainerToClass already does. A class cannot be created
-  // without a trainer — enforced here (required, not .optional()) so
-  // hitting the API directly can't bypass the frontend's dropdown.
+  // A User._id, not a TrainerProfile._id (the same convention as the userId
+  // of assignTrainerParamsSchema). The service resolves it to the matching
+  // TrainerProfile before saving. A class cannot be created without a
+  // trainer; this is enforced here (required, not .optional()) so calling the
+  // API directly cannot bypass the frontend's dropdown.
   trainer: objectIdSchema.min(1, "A trainer must be assigned to this class"),
 });
 
@@ -83,21 +78,19 @@ export const updateClassSchema = z
     message: "At least one field must be provided",
   });
 
-/**
- * 🔹 Params validation
- */
+/** Route params: class id. */
 export const classIdParamSchema = z.object({
   id: objectIdSchema,
 });
 
-// 🔹 Assign trainer to class (params)
+// Route params for assigning a trainer to a class.
 export const assignTrainerParamsSchema = z.object({
   id: objectIdSchema, // classId
-  userId: objectIdSchema, // userId (user with "trainer" role)
+  userId: objectIdSchema, // userId (a user with the "trainer" role)
 });
 
-// 🔹 Add/Remove member to/from class (params)
+// Route params for adding or removing a member of a class.
 export const memberClassParamsSchema = z.object({
   id: objectIdSchema, // classId
-  userId: objectIdSchema, // userId (user with "member" role)
+  userId: objectIdSchema, // userId (a user with the "member" role)
 });

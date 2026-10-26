@@ -3,15 +3,14 @@ import * as PaymentRepo from "../repositories/payment.repository";
 import { verifyPayment } from "../services/payment.service";
 import * as ClassRepo from "../repositories/class.repository";
 
-// How old a "pending" payment must be before we bother re-checking it —
-// gives a normal checkout flow (redirect, verify) plenty of time to
-// complete on its own first.
+// How old a "pending" payment must be before it is re-checked. This gives a
+// normal checkout flow (redirect, verify) time to complete on its own first.
 const STALE_THRESHOLD_MINUTES = 30;
 
-// Absolute cutoff: if a payment is still unresolved after this long
-// (Paystack can't confirm it either way — bad reference, truly
-// abandoned before reaching Paystack at all, etc.), force it to
-// "failed" rather than let it sit as "pending" indefinitely.
+// Absolute cutoff: a payment still unresolved after this long (Paystack
+// cannot confirm it either way, for example a bad reference or a checkout
+// abandoned before reaching Paystack) is forced to "failed" instead of
+// staying "pending" indefinitely.
 const HARD_EXPIRY_HOURS = 24;
 
 export const runPaymentCleanup = async () => {
@@ -27,26 +26,25 @@ export const runPaymentCleanup = async () => {
 
   for (const payment of stalePayments) {
     try {
-      // verifyPayment() already persists "completed" or "failed" based
-      // on Paystack's real answer, plus runs subscription creation /
-      // class enrollment on success — reusing it here means this sweep
-      // behaves identically to a normal user-triggered verification,
-      // not a separate parallel code path that could drift out of sync.
+      // verifyPayment() already persists "completed" or "failed" from
+      // Paystack's real answer and runs subscription creation and class
+      // enrollment on success. Reusing it makes the sweep behave exactly like
+      // a user-triggered verification, with no parallel code path that could
+      // drift out of sync.
       await verifyPayment(payment.paystackReference as string);
       console.log(`✅ Resolved stale payment ${payment.paystackReference}`);
     } catch (err) {
-      // verifyPayment throws when Paystack reports failure or the
-      // request itself errors — but per the fix in payment.service.ts,
-      // it already persisted "failed" to the DB before throwing in the
-      // "Paystack confirmed failure" case. This catch exists so one
-      // bad reference doesn't halt the rest of the sweep.
+      // verifyPayment throws when Paystack reports a failure or the request
+      // itself errors. In the "Paystack confirmed failure" case it has already
+      // persisted "failed" before throwing. This catch makes one bad reference
+      // not stop the rest of the sweep.
       console.log(
         `⚠️ Could not resolve ${payment.paystackReference} this pass.`,
       );
 
-      // Safety net for references Paystack genuinely can't confirm
-      // (e.g. network error mid-check, or the reference never
-      // completed initialization) — don't let these sit forever.
+      // Safety net for references Paystack cannot confirm (for example a
+      // network error mid-check, or a reference that never finished
+      // initialization): do not let them stay pending forever.
       if (new Date(payment.createdAt) < hardExpiry) {
         await PaymentRepo.updatePaymentByReference(
           payment.paystackReference as string,
@@ -69,8 +67,8 @@ export const runPaymentCleanup = async () => {
 };
 
 /**
- * Schedules the sweep to run every 15 minutes. Call this once at
- * server startup (see index.ts).
+ * Schedules the sweep to run every 15 minutes. Call it once at server
+ * startup (see index.ts).
  */
 export const startPaymentCleanupJob = () => {
   cron.schedule("*/15 * * * *", runPaymentCleanup);

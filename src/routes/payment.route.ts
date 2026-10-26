@@ -4,15 +4,10 @@ import { protect } from "../middleware/auth.middleware";
 
 const router = express.Router();
 
-/**
- * PUBLIC - Paystack Webhook
- */
+// Public: Paystack webhook.
 router.post("/webhook", paymentController.paystackWebhookController);
 
-/**
- * MEMBER ONLY - Payment actions
- * (Only members pay for classes)
- */
+// Member only: payment actions (only members pay for classes).
 router.post(
   "/initiate",
   protect(["member"]),
@@ -31,10 +26,7 @@ router.get(
   paymentController.getMyPayments,
 );
 
-/**
- * ADMIN ONLY - Financial data
- * (Trainers should NOT see payment amounts)
- */
+// Admin only: financial data (trainers must not see payment amounts).
 router.get(
   "/class/:classId",
   protect(["admin"]),

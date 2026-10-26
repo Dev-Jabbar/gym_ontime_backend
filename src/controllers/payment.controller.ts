@@ -15,10 +15,7 @@ import {
   classIdParamSchema,
 } from "../validations/payment.validation";
 
-/**
- * INITIATE PAYMENT
- * POST /api/payments/initiate
- */
+/** POST /api/payments/initiate: starts a checkout (member). */
 export const initiatePayment = async (req: Request, res: Response) => {
   try {
     const { classId, paymentType, subscriptionInterval } =
@@ -32,7 +29,7 @@ export const initiatePayment = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ UPDATED: Pass new parameters to service
+    // Pass the payment type and subscription interval through to the service.
     const result = await createCheckoutSession({
       userId,
       classId,
@@ -61,10 +58,7 @@ export const initiatePayment = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * VERIFY PAYMENT
- * GET /api/payments/verify?reference=xxx
- */
+/** GET /api/payments/verify?reference=xxx: verifies a payment (member). */
 export const verifyPaymentController = async (req: Request, res: Response) => {
   try {
     const { reference } = verifyPaymentSchema.parse(req.query);
@@ -91,10 +85,7 @@ export const verifyPaymentController = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * GET MY PAYMENTS
- * GET /api/payments/my-payments
- */
+/** GET /api/payments/my-payments: lists the member's payments. */
 export const getMyPayments = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
@@ -120,10 +111,7 @@ export const getMyPayments = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * GET ALL PAYMENTS (Admin only)
- * GET /api/payments
- */
+/** GET /api/payments: lists all payments (admin). */
 export const getAllPaymentsController = async (req: Request, res: Response) => {
   try {
     const payments = await getAllPayments();
@@ -140,10 +128,7 @@ export const getAllPaymentsController = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * GET PAYMENT BY ID (Admin only)
- * GET /api/payments/:id
- */
+/** GET /api/payments/:id: returns one payment (admin). */
 export const getPaymentByIdController = async (req: Request, res: Response) => {
   try {
     const { id } = paymentIdParamSchema.parse(req.params);
@@ -177,10 +162,7 @@ export const getPaymentByIdController = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * GET CLASS PAYMENTS (Admin only - financial data)
- * GET /api/payments/class/:classId
- */
+/** GET /api/payments/class/:classId: lists a class's payments (admin; financial data). */
 export const getClassPaymentsController = async (
   req: Request,
   res: Response,
@@ -210,10 +192,7 @@ export const getClassPaymentsController = async (
   }
 };
 
-/**
- * PAYSTACK WEBHOOK
- * POST /api/payments/webhook
- */
+/** POST /api/payments/webhook: Paystack webhook (public, signature-verified). */
 export const paystackWebhookController = async (
   req: Request,
   res: Response,

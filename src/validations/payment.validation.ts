@@ -1,15 +1,11 @@
 import { z } from "zod";
 
-/**
- * 🔹 Reusable Mongo ObjectId validation
- */
+/** Reusable MongoDB ObjectId validation. */
 export const objectIdSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ObjectId");
 
-/**
- * 🔹 Initiate payment (UPDATED with subscription support)
- */
+/** Body for starting a checkout, including subscription options. */
 export const initiatePaymentSchema = z
   .object({
     classId: objectIdSchema,
@@ -20,7 +16,7 @@ export const initiatePaymentSchema = z
   })
   .refine(
     (data) => {
-      // If subscription, interval is required
+      // A subscription requires an interval.
       if (data.paymentType === "subscription" && !data.subscriptionInterval) {
         return false;
       }
@@ -33,30 +29,22 @@ export const initiatePaymentSchema = z
     },
   );
 
-/**
- * 🔹 Verify payment (query params)
- */
+/** Query params for verifying a payment. */
 export const verifyPaymentSchema = z.object({
   reference: z.string().min(1, "Payment reference is required"),
 });
 
-/**
- * 🔹 Payment ID param validation
- */
+/** Route params: payment id. */
 export const paymentIdParamSchema = z.object({
   id: objectIdSchema,
 });
 
-/**
- * 🔹 Class ID param validation (for getting class payments)
- */
+/** Route params: class id (for listing a class's payments). */
 export const classIdParamSchema = z.object({
   classId: objectIdSchema,
 });
 
-/**
- * 🔹 Webhook payload validation (optional but good practice)
- */
+/** Shape of the Paystack webhook payload. */
 export const paystackWebhookSchema = z.object({
   event: z.string(),
   data: z.object({
@@ -68,9 +56,7 @@ export const paystackWebhookSchema = z.object({
   }),
 });
 
-/**
- * 🔹 Payment status filter (for queries)
- */
+/** Payment status filter for queries. */
 export const paymentStatusSchema = z.object({
   status: z.enum(["pending", "completed", "failed"]).optional(),
   provider: z.enum(["stripe", "paystack"]).optional(),

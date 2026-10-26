@@ -9,9 +9,7 @@ import {
   memberIdParamSchema,
 } from "../validations/member-profile.validation";
 
-/**
- * CREATE MY MEMBER PROFILE
- */
+/** Creates the logged-in member's profile. */
 export const createMemberProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -20,7 +18,7 @@ export const createMemberProfile = async (req: Request, res: Response) => {
     const fullUser = await userRepository.findUserById(userPayload.id);
     if (!fullUser) throw new AppError("User not found", 404);
 
-    const data = createMemberSchema.parse(req.body); // ✅ validate all fields
+    const data = createMemberSchema.parse(req.body); // Validates all fields.
 
     const memberProfile = await memberService.createMemberProfile(fullUser, {
       avatar: data.avatar,
@@ -47,9 +45,7 @@ export const createMemberProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * GET MY MEMBER PROFILE
- */
+/** Returns the logged-in member's profile. */
 export const getMyMemberProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -69,9 +65,7 @@ export const getMyMemberProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * UPDATE MY MEMBER PROFILE
- */
+/** Updates the logged-in member's profile. */
 export const updateMyMemberProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -99,9 +93,7 @@ export const updateMyMemberProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * DELETE MY MEMBER PROFILE
- */
+/** Soft-deletes the logged-in member's profile. */
 export const deleteMyMemberProfile = async (req: Request, res: Response) => {
   try {
     const userPayload = req.user;
@@ -119,9 +111,7 @@ export const deleteMyMemberProfile = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * PUBLIC: GET ALL MEMBER PROFILES
- */
+/** Lists all member profiles (public in this version). */
 export const getAllMemberProfiles = async (_req: Request, res: Response) => {
   try {
     const memberProfiles = await memberService.getAllMemberProfiles();
@@ -133,9 +123,7 @@ export const getAllMemberProfiles = async (_req: Request, res: Response) => {
   }
 };
 
-/**
- * PUBLIC: GET MEMBER PROFILE BY ID
- */
+/** Returns one member profile (public in this version). */
 export const getMemberProfileById = async (req: Request, res: Response) => {
   try {
     const { id } = memberIdParamSchema.parse(req.params);

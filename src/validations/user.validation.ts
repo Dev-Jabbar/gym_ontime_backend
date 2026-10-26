@@ -1,14 +1,14 @@
 import { z } from "zod";
 
 /**
- * 🔹 Reusable ObjectId
+ * Reusable ObjectId
  */
 export const objectIdSchema = z
   .string()
   .regex(/^[0-9a-fA-F]{24}$/, "Invalid MongoDB ObjectId");
 
 /**
- * 🔹 Register
+ * Register
  */
 export const registerUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -18,7 +18,7 @@ export const registerUserSchema = z.object({
 });
 
 /**
- * 🔹 Login
+ * Login
  */
 export const loginUserSchema = z.object({
   email: z.email(),
@@ -26,7 +26,7 @@ export const loginUserSchema = z.object({
 });
 
 /**
- * 🔹 Update
+ * Update
  */
 export const updateUserSchema = z
   .object({
@@ -38,7 +38,7 @@ export const updateUserSchema = z
   });
 
 /**
- * 🔹 Params
+ * Params
  */
 export const userIdParamSchema = z.object({
   id: objectIdSchema,
