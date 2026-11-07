@@ -1,8 +1,9 @@
 import ClassModel, { IClass } from "../models/class.model";
 import { Types } from "mongoose";
-
 import mongoose from "mongoose";
 
+// Reusable population configuration for retrieving trainer information
+// together with the User information linked to that trainer.
 const TRAINER_POPULATE = {
   path: "trainer",
   select:
@@ -13,22 +14,33 @@ const TRAINER_POPULATE = {
   },
 };
 
+// ============================================================
+// BASIC CLASS OPERATIONS
+// ============================================================
+
+// Creates a new class using the supplied class data.
 export const createClass = async (data: Partial<IClass>) => {
   return ClassModel.create(data);
 };
 
+// Retrieves all classes and their associated trainer information.
 export const findAllClasses = async () => {
   return ClassModel.find().populate(TRAINER_POPULATE);
 };
 
+// Finds a specific class using its MongoDB ID.
 export const findClassById = async (id: string) => {
   return ClassModel.findById(id).populate(TRAINER_POPULATE);
 };
 
+// Finds a class with a matching name and schedule.
+// Used to check whether a class with the same details already exists.
 export const findByNameAndSchedule = async (name: string, schedule: Date) => {
   return ClassModel.findOne({ name, schedule });
 };
 
+// Adds a member to the confirmed members array.
+// $addToSet prevents the same member from being added twice.
 export const addMemberToClass = async (classId: string, memberId: string) => {
   return ClassModel.findByIdAndUpdate(
     classId,
@@ -37,45 +49,51 @@ export const addMemberToClass = async (classId: string, memberId: string) => {
   );
 };
 
+// Updates an existing class using its ID and the supplied data.
 export const updateClass = async (id: string, data: Partial<IClass>) => {
   return ClassModel.findByIdAndUpdate(id, data, { new: true });
 };
 
+// Deletes a class using its ID.
 export const deleteClass = async (id: string) => {
   return ClassModel.findByIdAndDelete(id);
 };
 
+// ============================================================
+// SEAT RESERVATION AND ENROLLMENT OPERATIONS
+// ============================================================
+
 /**
  * Atomically reserves a temporary seat hold for a class, if one is
- * available. Called when a member starts checkout; the hold is what stops
- * two people paying for the same last seat.
+ * available. Called when a member starts checkout.
  *
- * The capacity check and the write are a single MongoDB `findOneAndUpdate`,
- * not a "check, then write" pair of queries. With two separate steps, two
- * concurrent requests could both pass the check before either one writes (a
- * race condition). One atomic operation closes that gap: only one caller's
- * filter can still match by the time the write happens.
+ * The capacity check and database update happen in one atomic
+ * findOneAndUpdate operation. This prevents concurrent requests
+ * from successfully reserving the same last available seat.
  *
- * Available capacity is confirmed `members` plus other people's unexpired
- * `pendingMembers`. A class with unlimited capacity (`capacity: null`) skips
- * the check.
+ * Occupied seats are calculated using:
+ * - Confirmed members.
+ * - Pending reservations that have not expired.
+ *
+ * Unlimited-capacity classes (capacity: null) skip the capacity check.
  *
  * @param classId - The class being booked.
  * @param memberId - The member attempting to book.
- * @param ttlMinutes - How long the hold lasts before it expires.
- * @returns The updated class document if the hold was placed, or `null` if
- *   the class is full or does not exist.
+ * @param ttlMinutes - How long the temporary reservation lasts.
+ * @returns The updated class if successful, otherwise null.
  */
 export const reserveSeat = async (
   classId: string,
   memberId: string,
   ttlMinutes: number,
 ) => {
+  // 1. Calculate the reservation's expiry time.
   const now = new Date();
   const expiresAt = new Date(now.getTime() + ttlMinutes * 60 * 1000);
 
-  // Clear this member's own expired holds first, so a retry after a lapsed
-  // hold is not blocked by their leftover entry.
+  // 2. Remove this member's previously expired reservation.
+  // This allows the member to try reserving again after their
+  // previous reservation has expired.
   await ClassModel.updateOne(
     { _id: classId },
     {
@@ -85,53 +103,82 @@ export const reserveSeat = async (
     },
   );
 
+  // 3. Retrieve the class capacity.
+  // We only need the capacity field for the upcoming availability check.
   const classDoc = await ClassModel.findById(classId).select("capacity");
+
+  // Stop if the requested class does not exist.
   if (!classDoc) return null;
 
+  // 4. Build the conditions the class must satisfy before reserving a seat.
   const filter: any = {
+    // Only reserve a seat in the requested class.
     _id: classId,
+
+    // The member must not already be enrolled.
     members: { $ne: memberId },
+
+    // The member must not already have a pending reservation.
     "pendingMembers.member": { $ne: memberId },
   };
 
-  // Only classes with a set capacity need the seat-counting condition;
-  // unlimited-capacity classes (capacity: null) always have room.
+  // 5. Check available capacity if the class has a defined limit.
+  // Unlimited-capacity classes do not need this condition.
   if (classDoc.capacity != null) {
     filter.$expr = {
+      // The total occupied seats must be less than the class capacity.
       $lt: [
         {
           $add: [
+            // Count confirmed members.
             { $size: "$members" },
+
+            // Count pending reservations that have not expired.
             {
               $size: {
                 $filter: {
+                  // Use pendingMembers, or an empty array if it is null.
                   input: { $ifNull: ["$pendingMembers", []] },
+
+                  // Give each pending reservation the temporary name "p".
                   as: "p",
+
+                  // Only count reservations whose expiry is still in the future.
                   cond: { $gt: ["$$p.expiresAt", now] },
                 },
               },
             },
           ],
         },
+
+        // Compare the occupied seat count against the class capacity.
         "$capacity",
       ],
     };
   }
 
+  // 6. Atomically check all conditions and create the reservation.
+  // If another request takes the last seat first, this filter will no
+  // longer match and MongoDB will return null.
   return ClassModel.findOneAndUpdate(
     filter,
+
+    // Add the member and their expiry time to pendingMembers.
     { $push: { pendingMembers: { member: memberId, expiresAt } } },
+
+    // Return the updated class document.
     { new: true },
   );
 };
 
 /**
- * Immediately releases a member's seat hold instead of waiting for it to
- * expire. Called when payment fails, checkout is abandoned, or Paystack
- * initialization fails after a hold was placed; keeping the seat locked any
- * longer would only block someone else.
+ * Immediately releases a member's temporary seat reservation.
+ *
+ * Used when payment fails, checkout is abandoned, or payment
+ * initialization fails after a reservation has been created.
  */
 export const releaseSeat = async (classId: string, memberId: string) => {
+  // Find the class and remove this member's pending reservation.
   return ClassModel.findByIdAndUpdate(
     classId,
     { $pull: { pendingMembers: { member: memberId } } },
@@ -140,85 +187,144 @@ export const releaseSeat = async (classId: string, memberId: string) => {
 };
 
 /**
- * Converts a member's temporary hold into a confirmed seat once payment has
- * succeeded. It only matches if the member still has an unexpired hold
- * (`expiresAt` in the future), which stops a late payment from confirming
- * into a seat that may already have been given to someone else.
+ * Converts a valid temporary reservation into a confirmed enrollment.
  *
- * @returns The updated class document if the hold was valid and is now
- *   confirmed, or `null` if the hold had expired or never existed. Callers
- *   must treat `null` as "seat no longer available" and flag the payment for
- *   review rather than assume success.
+ * Only reservations that have not expired can be confirmed.
+ *
+ * @returns The updated class if confirmation succeeds, otherwise null.
  */
 export const confirmSeat = async (classId: string, memberId: string) => {
+  // 1. Get the current time to check whether the reservation is still valid.
   const now = new Date();
+
+  // 2. Find the class containing this member's active reservation.
   return ClassModel.findOneAndUpdate(
     {
       _id: classId,
+
+      // The member must have a pending reservation whose expiry
+      // is later than the current time.
       pendingMembers: {
         $elemMatch: { member: memberId, expiresAt: { $gt: now } },
       },
     },
+
     {
+      // 3. Add the member to confirmed members.
+      // $addToSet prevents duplicate member IDs.
       $addToSet: { members: memberId },
+
+      // 4. Remove the member's temporary reservation.
       $pull: { pendingMembers: { member: memberId } },
     },
+
+    // Return the updated class document.
     { new: true },
   );
 };
 
 /**
- * Removes every hold whose `expiresAt` has passed, across all classes. This
- * is the safety net for holds nobody confirmed or released (for example the
- * user closed the browser mid-checkout). Run on a schedule by the payment
- * cleanup job, never from a request path.
+ * Removes every expired pending reservation across all classes.
+ *
+ * This is a cleanup operation for reservations that were never
+ * confirmed or manually released, such as abandoned checkouts.
+ *
+ * Usually executed periodically by a scheduled cleanup job.
  */
 export const releaseExpiredHolds = async () => {
+  // 1. Get the current time.
   const now = new Date();
+
+  // 2. Find every class containing at least one expired reservation.
   return ClassModel.updateMany(
     { "pendingMembers.expiresAt": { $lte: now } },
+
+    // 3. Remove every expired reservation from matching classes.
     { $pull: { pendingMembers: { expiresAt: { $lte: now } } } },
   );
 };
 
-// Reports why a member can or cannot book. Besides "already enrolled" and
-// "class full", it distinguishes "hold-expired" (the hold ran out before
-// payment) so verifyPayment and the webhook can tell the cases apart.
+/**
+ * Determines why a member can or cannot enroll in a class.
+ *
+ * Possible statuses:
+ * - class-not-found
+ * - already-enrolled
+ * - hold-expired
+ * - class-full
+ * - unknown
+ */
+/**
+ * Determines why a member can or cannot enroll in a class.
+ *
+ * Capacity is calculated using confirmed members and all other members'
+ * unexpired pending reservations.
+ *
+ * Possible statuses:
+ * - class-not-found
+ * - already-enrolled
+ * - hold-expired
+ * - class-full
+ * - unknown
+ */
 export const getClassEnrollmentStatus = async (
   classId: string,
   memberId: string,
 ) => {
+  // 1. Retrieve only the class information needed for enrollment checks.
   const classItem = await ClassModel.findById(classId).select(
     "members capacity pendingMembers",
   );
+
+  // Stop if the class does not exist.
   if (!classItem) return "class-not-found" as const;
 
+  // 2. Check whether the member is already enrolled.
   const alreadyMember = classItem.members.some(
     (m) => m.toString() === memberId,
   );
+
   if (alreadyMember) return "already-enrolled" as const;
 
+  // 3. Get the current time for checking reservation expiry.
   const now = new Date();
+
+  // 4. Check whether this member has any pending reservation.
   const hadHold = (classItem.pendingMembers ?? []).some(
     (p) => p.member.toString() === memberId,
   );
+
+  // 5. Check whether this member has an unexpired reservation.
   const hasActiveHold = (classItem.pendingMembers ?? []).some(
     (p) => p.member.toString() === memberId && p.expiresAt > now,
   );
 
+  // If a reservation exists but none is active, the hold has expired.
   if (hadHold && !hasActiveHold) return "hold-expired" as const;
 
-  if (
-    classItem.capacity != null &&
-    classItem.members.length >= classItem.capacity
-  ) {
-    return "class-full" as const;
+  // 6. Check whether the class has reached capacity.
+  // Count confirmed members plus all other members' active pending holds.
+  if (classItem.capacity != null) {
+    const activePendingHolds = (classItem.pendingMembers ?? []).filter(
+      (p) => p.member.toString() !== memberId && p.expiresAt > now,
+    ).length;
+
+    const occupiedSeats = classItem.members.length + activePendingHolds;
+
+    if (occupiedSeats >= classItem.capacity) {
+      return "class-full" as const;
+    }
   }
 
+  // 7. No specific enrollment problem was identified.
   return "unknown" as const;
 };
 
-// Removes a member from a class.
+// ============================================================
+// MEMBER MANAGEMENT
+// ============================================================
+
+// Removes a specific member from a class's confirmed members array.
 export const removeMemberFromClass = async (
   classId: string,
   memberId: string,
@@ -230,7 +336,8 @@ export const removeMemberFromClass = async (
   );
 };
 
-// Removes a member from every class (used when a profile is deleted).
+// Removes a member from every class they are enrolled in.
+// Used when deleting a member profile.
 export const removeMemberFromClasses = async (
   memberId: string,
   session?: mongoose.ClientSession,
@@ -242,7 +349,11 @@ export const removeMemberFromClasses = async (
   );
 };
 
-// Assigns or changes a class's trainer.
+// ============================================================
+// TRAINER MANAGEMENT
+// ============================================================
+
+// Assigns a trainer to a class or changes the existing trainer.
 export const assignTrainerToClass = async (
   classId: string,
   trainerId: string,
@@ -254,6 +365,9 @@ export const assignTrainerToClass = async (
   );
 };
 
+// Removes a trainer assignment from every class.
+// An optional MongoDB session allows this operation to participate
+// in a larger transaction.
 export const removeTrainerFromClasses = async (
   trainerId: string,
   session?: mongoose.ClientSession,
@@ -265,6 +379,8 @@ export const removeTrainerFromClasses = async (
   );
 };
 
+// Performs the same trainer-removal operation as the function above.
+// Kept as a separate exported function for existing callers.
 export const removeTrainerFromClassesByUser = async (
   trainerId: string,
   session?: mongoose.ClientSession,
@@ -276,26 +392,39 @@ export const removeTrainerFromClassesByUser = async (
   );
 };
 
-// Finds classes taught by a trainer.
+// ============================================================
+// CLASS LOOKUPS
+// ============================================================
+
+// Finds all classes assigned to a particular trainer.
+// Also retrieves the trainer's associated information.
 export const findClassesByTrainerId = async (trainerId: string) => {
   return ClassModel.find({ trainer: trainerId }).populate(TRAINER_POPULATE);
 };
 
-// Finds the classes a member is enrolled in. Used by the admin member-details
-// view ("classes joined").
+// Finds all classes a member is enrolled in.
+// Used by the admin member-details view to display classes joined.
 export const findClassesByMemberId = async (memberProfileId: string) => {
   return ClassModel.find({ members: memberProfileId }).populate(
     TRAINER_POPULATE,
   );
 };
 
-// Used by the class reminder job. Needs every class's schedule plus each
-// enrolled member's underlying User._id, because Notification.user references
-// User, not MemberProfile.
+/**
+ * Retrieves all classes needed by the class reminder job.
+ *
+ * Populates the enrolled members and their underlying User IDs because
+ * Notification.user references User, not MemberProfile.
+ */
 export const findAllClassesForReminderCheck = async () => {
   return ClassModel.find().populate({
+    // Populate the members array.
     path: "members",
+
+    // Only retrieve each member's userId.
     select: "userId",
+
+    // Populate the User document referenced by userId.
     populate: {
       path: "userId",
       select: "_id",
@@ -303,6 +432,7 @@ export const findAllClassesForReminderCheck = async () => {
   });
 };
 
+// Updates the timestamp recording when a class reminder was last sent.
 export const markReminderSent = async (classId: string, sentAt: Date) => {
   return ClassModel.findByIdAndUpdate(classId, {
     lastReminderSentAt: sentAt,

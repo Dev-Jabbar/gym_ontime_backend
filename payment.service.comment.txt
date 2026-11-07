@@ -1,0 +1,9 @@
+In src/services/payment.service.ts, in the comment block above claimSeat,
+replace this line:
+
+ *  - `"class-full"`: no hold existed and the class has no room
+
+with:
+
+ *  - `"class-full"`: the class has no room, counting confirmed members plus
+ *    other members' unexpired holds (the member's own hold is not counted)

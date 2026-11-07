@@ -143,6 +143,8 @@ flowchart TD
     BD -->|hold expired / class full| Review[Flagged needsReview]
 ```
 
+"Class full" counts confirmed members plus other members' unexpired holds (never the member's own hold), the same rule the seat reservation uses.
+
 See [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) for the full breakdown of every state this can resolve to.
 
 ## API Reference

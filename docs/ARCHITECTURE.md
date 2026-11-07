@@ -85,6 +85,8 @@ flowchart TD
     Outcome -->|already-enrolled| NoOp[No-op, already handled]
 ```
 
+**What `class-full` means here:** `getClassEnrollmentStatus` reports the class as full when confirmed members plus every *other* member's currently unexpired hold reach the class capacity. The member's own hold is never counted against them. This is the same rule the seat reservation itself uses, so the "why did this fail?" answer and the booking step always agree.
+
 **Why the webhook alone isn't enough:** Paystack only sends a webhook event for a *successful* charge — never for a failed or declined one. That means the manual verification path (triggered by the user's own post-checkout redirect, or the cleanup cron sweep) is the only place in the system that ever learns a payment failed, so it's responsible for marking it `failed` and releasing the seat hold. Relying on the webhook alone would leave failed payments stuck as `pending` forever.
 
 **Why one shared function instead of two implementations:** this file's history is a real example of the alternative going wrong — the webhook handler used to contain its own separate copy of the seat-claiming logic, and it had already drifted out of sync (missing subscription creation that the main path had). Consolidating both triggers onto one function removed an entire class of "the two paths disagree" bugs by construction, not by discipline.
